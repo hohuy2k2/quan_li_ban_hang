@@ -8,11 +8,23 @@
 - Danh sách sắp xếp theo tên; tìm theo tên, mã, hãng, loại (tìm không dấu); lọc theo hãng và loại.
 - Nhật ký thêm/sửa/xoá sản phẩm và biến động số lượng.
 - In tem 50 × 30 mm gồm tên, giá bán và mã vạch Code 128.
-- Bán hàng bằng mã quét hoặc tìm thủ công. Quét lại cùng mã tăng số lượng trong đơn.
+- Bán hàng bằng mã quét hoặc tìm thủ công. Sau khi quét xong, sản phẩm tự vào đơn mà không cần Enter; quét lại cùng mã tăng số lượng.
 - Nhập tên, số điện thoại khách và xem thời gian, tổng tiền ở bên phải. Thanh toán lưu hoá đơn và trừ kho trong cùng giao dịch.
-- Xem hoá đơn và tải bản sao lưu cơ sở dữ liệu.
+- Lọc hoá đơn theo ngày hoặc khoảng ngày; sửa hoá đơn trước khi có hàng trả. Chênh lệch số lượng khi sửa sẽ tự điều chỉnh tồn kho.
+- Trả một phần hoặc toàn bộ hàng theo hoá đơn: hàng khách không còn nhu cầu sử dụng được nhập lại kho và hoàn tiền; hàng lỗi có thể đi bảo hành hoặc bỏ đi, không hoàn tiền và không tăng tồn kho. Có thể đánh dấu hàng bảo hành đã trả lại khách hoặc bỏ đi.
+- Lọc và tìm lịch sử sản phẩm, biến động kho; nhấn mã hoá đơn trong lịch sử kho để xem chi tiết. Tải bản sao lưu cơ sở dữ liệu.
 
 Mục **Có thuế / Chưa thuế** hiện chỉ ghi lại trạng thái của **giá nhập**. Ứng dụng chưa tự tính thuế vì chưa có thuế suất và quy tắc tính được xác định.
+
+Khi đã ghi nhận hàng trả, hoá đơn được giữ nguyên để đối chiếu và không thể sửa nữa. Hàng bảo hành vẫn thuộc khách hàng nên không được cộng vào tồn kho bán được. Doanh thu hôm nay là tiền bán hôm nay trừ tiền hoàn trả hôm nay.
+
+## Cấu trúc giao diện
+
+- `frontend/src/App.tsx`: khung ứng dụng, điều hướng và tải dữ liệu chung.
+- `frontend/src/pages/`: bốn màn hình bán hàng, sản phẩm, hoá đơn và lịch sử. Mỗi màn hình giữ trạng thái của chức năng mình.
+- `frontend/src/components/`: biểu mẫu sản phẩm, hộp thoại in tem và chi tiết hoá đơn.
+- `frontend/src/utils/format.ts`: định dạng tiền, ngày giờ, tìm kiếm và nội dung lịch sử.
+- `frontend/src/api.ts` và `frontend/src/types.ts`: gọi backend và khai báo kiểu dữ liệu.
 
 ## Cài công cụ và thư viện (bạn tự chạy)
 
@@ -32,7 +44,7 @@ dotnet restore backend\backend.csproj
 Mở hai cửa sổ PowerShell tại thư mục dự án:
 
 ```powershell
-dotnet run --project backend\backend.csproj --urls http://127.0.0.1:5000
+dotnet run --project backend
 ```
 
 ```powershell
@@ -57,5 +69,7 @@ Thư mục `release` chứa ứng dụng đã đóng gói. Sau đó có thể nh
 ## Dữ liệu và sao lưu
 
 Tệp dữ liệu mặc định nằm tại `%LOCALAPPDATA%\QuanLyBanHang\inventory.db`. Có thể đổi thư mục bằng biến môi trường `INVENTORY_DATA_DIR`. Nút **Sao lưu dữ liệu** tải một bản sao SQLite. Để khôi phục, đóng ứng dụng rồi thay tệp `inventory.db` bằng bản sao đã tải, sau khi giữ thêm một bản của tệp hiện tại.
+
+Trước lần chạy đầu sau khi cập nhật phần trả hàng, hãy dùng nút **Sao lưu dữ liệu** trên bản cũ. Bản mới sẽ tự tạo các bảng lưu hàng trả trong cơ sở dữ liệu hiện có; dữ liệu sản phẩm và hoá đơn cũ được giữ lại. Nếu đang chạy backend, dừng tiến trình đó rồi khởi động lại để nạp mã mới.
 
 Mỗi món hàng cùng loại dùng chung mã vạch. Mã vạch lưu **mã sản phẩm**, không lưu giá. Khi sửa giá, hãy in lại tem giá cho hàng còn trên kệ.

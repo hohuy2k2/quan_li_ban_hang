@@ -1,4 +1,4 @@
-import type { Product, ProductAudit, ProductInput, Sale, StockMovement, Summary } from './types'
+import type { Product, ProductAudit, ProductInput, ReturnInput, Sale, SaleInput, SaleReturn, SaleReturnItem, StockMovement, Summary } from './types'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   let response: Response
@@ -29,10 +29,15 @@ export const api = {
     method: 'PUT', body: JSON.stringify(input),
   }),
   deleteProduct: (id: number) => request<void>(`/products/${id}`, { method: 'DELETE' }),
-  sales: () => request<Sale[]>('/sales'),
-  createSale: (data: { customerName: string; customerPhone: string; items: { productId: number; quantity: number }[] }) =>
+  sales: (range?: { from?: string; to?: string }) => request<Sale[]>(`/sales${range ? `?${new URLSearchParams(Object.entries(range).filter(([, value]) => Boolean(value)) as [string, string][]).toString()}` : ''}`),
+  saleByNumber: (number: string) => request<Sale>(`/sales/by-number/${encodeURIComponent(number)}`),
+  createSale: (data: SaleInput) =>
     request<Sale>('/sales', { method: 'POST', body: JSON.stringify(data) }),
-  history: () => request<ProductAudit[]>('/history'),
-  movements: () => request<StockMovement[]>('/movements'),
+  updateSale: (id: number, data: SaleInput) => request<Sale>(`/sales/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  returnItems: (id: number, data: ReturnInput) => request<SaleReturn>(`/sales/${id}/returns`, { method: 'POST', body: JSON.stringify(data) }),
+  resolveWarranty: (id: number, outcome: 'returned_to_customer' | 'discard') =>
+    request<SaleReturnItem>(`/returns/items/${id}/warranty`, { method: 'PATCH', body: JSON.stringify({ outcome }) }),
+  history: (filters?: { action?: string; query?: string }) => request<ProductAudit[]>(`/history${filters ? `?${new URLSearchParams(Object.entries(filters).filter(([, value]) => Boolean(value)) as [string, string][]).toString()}` : ''}`),
+  movements: (filters?: { direction?: string; query?: string }) => request<StockMovement[]>(`/movements${filters ? `?${new URLSearchParams(Object.entries(filters).filter(([, value]) => Boolean(value)) as [string, string][]).toString()}` : ''}`),
   summary: () => request<Summary>('/summary'),
 }

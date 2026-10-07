@@ -33,6 +33,45 @@ export interface Sale {
   soldAt: string
   total: number
   items: SaleItem[]
+  returns: SaleReturn[]
+}
+
+export type ReturnDisposition = 'restock' | 'warranty' | 'discard'
+
+export interface SaleReturnItem {
+  id: number
+  saleReturnId: number
+  saleItemId: number
+  productId: number
+  productCode: string
+  productName: string
+  unitPrice: number
+  quantity: number
+  disposition: ReturnDisposition
+  refundAmount: number
+  warrantyResolution: '' | 'returned_to_customer' | 'discard'
+  warrantyResolvedAt: string | null
+}
+
+export interface SaleReturn {
+  id: number
+  saleId: number
+  number: string
+  reason: string
+  returnedAt: string
+  totalRefund: number
+  items: SaleReturnItem[]
+}
+
+export interface SaleInput {
+  customerName: string
+  customerPhone: string
+  items: { productId: number; quantity: number }[]
+}
+
+export interface ReturnInput {
+  reason: string
+  items: { saleItemId: number; quantity: number; disposition: ReturnDisposition; refund: boolean }[]
 }
 
 export interface ProductAudit {

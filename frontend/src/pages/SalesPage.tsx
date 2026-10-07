@@ -1,0 +1,169 @@
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import {
+  AlertTriangle, ArrowRight, Barcode as BarcodeIcon, Check, Minus, Package, Plus,
+  ReceiptText, ScanLine, Search, ShoppingCart, X,
+} from 'lucide-react'
+import { api } from '../api'
+import type { Product, Summary } from '../types'
+import { dateTime, money, searchKey } from '../utils/format'
+
+type CartLine = { product: Product; quantity: number }
+type Props = {
+  active: boolean
+  products: Product[]
+  summary: Summary | null
+  now: Date
+  onRefresh: () => Promise<void>
+  onShowInvoices: () => void
+  onShowLowStock: () => void
+  showToast: (message: string, kind?: 'success' | 'error') => void
+}
+
+export function SalesPage({ active, products, summary, now, onRefresh, onShowInvoices, onShowLowStock, showToast }: Props) {
+  const [cart, setCart] = useState<CartLine[]>([])
+  const [scanCode, setScanCode] = useState('')
+  const [manualSearch, setManualSearch] = useState('')
+  const [customerName, setCustomerName] = useState('')
+  const [customerPhone, setCustomerPhone] = useState('')
+  const [checkingOut, setCheckingOut] = useState(false)
+  const [lastInvoice, setLastInvoice] = useState('')
+  const scanRef = useRef<HTMLInputElement>(null)
+  const scanCodeRef = useRef('')
+  const scanTimerRef = useRef<number | undefined>(undefined)
+  const scanningRef = useRef(false)
+
+  useEffect(() => { if (active) scanRef.current?.focus() }, [active])
+  useEffect(() => () => window.clearTimeout(scanTimerRef.current), [])
+
+  const manualMatches = useMemo(() => {
+    if (!manualSearch.trim()) return []
+    const term = searchKey(manualSearch)
+    return products.filter(p => searchKey(`${p.code} ${p.name} ${p.brand} ${p.category}`).includes(term)).slice(0, 8)
+  }, [products, manualSearch])
+  const cartTotal = cart.reduce((sum, line) => sum + line.product.salePrice * line.quantity, 0)
+  const cartCount = cart.reduce((sum, line) => sum + line.quantity, 0)
+
+  function addToCart(product: Product) {
+    if (product.quantity <= 0) {
+      showToast(`${product.name} đã hết hàng.`, 'error')
+      return
+    }
+    const existing = cart.find(line => line.product.id === product.id)
+    if (existing && existing.quantity >= product.quantity) {
+      showToast(`Chỉ còn ${product.quantity} ${product.name} trong kho.`, 'error')
+      return
+    }
+    setCart(current => {
+      const found = current.find(line => line.product.id === product.id)
+      return found
+        ? current.map(line => line.product.id === product.id ? { ...line, quantity: line.quantity + 1 } : line)
+        : [...current, { product, quantity: 1 }]
+    })
+    setManualSearch('')
+    scanRef.current?.focus()
+  }
+
+  async function processScan(code: string) {
+    if (!code || scanCodeRef.current.trim() !== code) return
+    if (scanningRef.current) {
+      scanTimerRef.current = window.setTimeout(() => void processScan(code), 100)
+      return
+    }
+    scanningRef.current = true
+    window.clearTimeout(scanTimerRef.current)
+    scanCodeRef.current = ''
+    setScanCode('')
+    try {
+      addToCart(await api.lookup(code))
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Không tìm thấy sản phẩm.', 'error')
+    } finally {
+      scanningRef.current = false
+      scanRef.current?.focus()
+    }
+  }
+
+  function changeScanCode(value: string) {
+    scanCodeRef.current = value
+    setScanCode(value)
+    window.clearTimeout(scanTimerRef.current)
+    const code = value.trim()
+    if (code) scanTimerRef.current = window.setTimeout(() => void processScan(code), 350)
+  }
+
+  function submitScan(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    void processScan(scanCodeRef.current.trim())
+  }
+
+  function changeQuantity(id: number, nextQuantity: number) {
+    const line = cart.find(item => item.product.id === id)
+    if (!line) return
+    if (nextQuantity > line.product.quantity) {
+      showToast(`Chỉ còn ${line.product.quantity} ${line.product.name} trong kho.`, 'error')
+      return
+    }
+    setCart(current => nextQuantity <= 0
+      ? current.filter(item => item.product.id !== id)
+      : current.map(item => item.product.id === id ? { ...item, quantity: nextQuantity } : item))
+    scanRef.current?.focus()
+  }
+
+  async function checkout() {
+    if (!cart.length) return
+    setCheckingOut(true)
+    try {
+      const sale = await api.createSale({
+        customerName, customerPhone,
+        items: cart.map(line => ({ productId: line.product.id, quantity: line.quantity })),
+      })
+      setCart([])
+      setCustomerName('')
+      setCustomerPhone('')
+      setLastInvoice(sale.number)
+      showToast(`Thanh toán thành công · ${sale.number}`)
+      await onRefresh()
+      scanRef.current?.focus()
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Không lưu được đơn hàng.', 'error')
+      await onRefresh()
+    } finally { setCheckingOut(false) }
+  }
+
+  return (
+    <section className="page-content sales-page" style={{ display: active ? undefined : 'none' }}>
+      <div className="page-heading"><div><div className="eyebrow">QUẦY THANH TOÁN</div><h1>Bán hàng</h1><p>Quét mã để thêm sản phẩm vào đơn hàng đang mở.</p></div><div className="day-pill"><span />Hôm nay · {new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(now)}</div></div>
+      <div className="metrics-grid">
+        <div className="metric-card"><span className="metric-icon blue"><ReceiptText size={19} /></span><span>Đơn hôm nay</span><strong>{summary?.salesToday ?? 0}</strong></div>
+        <div className="metric-card"><span className="metric-icon green"><ShoppingCart size={19} /></span><span>Doanh thu hôm nay</span><strong>{money(summary?.revenueToday ?? 0)}</strong></div>
+        <button type="button" className="metric-card metric-button" onClick={onShowLowStock}><span className="metric-icon amber"><AlertTriangle size={19} /></span><span>Sắp hết hàng · xem danh sách</span><strong>{summary?.lowStockCount ?? 0} <small>sản phẩm</small></strong></button>
+      </div>
+      <div className="sales-layout">
+        <div className="sales-left">
+          <div className="panel scan-panel">
+            <div className="panel-heading"><div><span className="section-icon"><ScanLine size={19} /></span><h2>Quét mã sản phẩm</h2></div><span className="hint-tag">SẴN SÀNG QUÉT</span></div>
+            <form className="scan-form" onSubmit={submitScan}><BarcodeIcon size={22} /><input ref={scanRef} value={scanCode} onChange={event => changeScanCode(event.target.value)} placeholder="Quét mã vạch để tự thêm sản phẩm..." autoComplete="off" aria-label="Mã vạch sản phẩm" /><kbd>TỰ ĐỘNG</kbd></form>
+            <div className="helper-text">Quét xong, sản phẩm tự vào đơn sau một thoáng. Bạn vẫn có thể nhập mã rồi nhấn Enter.</div>
+            <div className="manual-search-wrap"><label htmlFor="manual-search">Hoặc tìm sản phẩm để thêm thủ công</label><div className="search-field"><Search size={18} /><input id="manual-search" value={manualSearch} onChange={event => setManualSearch(event.target.value)} placeholder="Nhập tên, hãng, loại hoặc mã sản phẩm" /></div>
+              {manualSearch.trim() && <div className="suggestions">{manualMatches.length ? manualMatches.map(p => <button key={p.id} onClick={() => addToCart(p)}><span className="suggestion-icon"><Package size={19} /></span><span className="suggestion-text"><strong>{p.name}</strong><small>{p.code} · {p.brand || 'Chưa có hãng'} · Còn {p.quantity}</small></span><b>{money(p.salePrice)}</b><Plus size={18} /></button>) : <div className="suggestion-empty">Không tìm thấy sản phẩm phù hợp.</div>}</div>}
+            </div>
+          </div>
+
+          <div className="panel cart-panel">
+            <div className="panel-heading"><div><span className="section-icon"><ShoppingCart size={19} /></span><h2>Sản phẩm trong đơn</h2><span className="count-badge">{cartCount}</span></div>{cart.length > 0 && <button className="text-danger" onClick={() => setCart([])}>Xoá đơn</button>}</div>
+            {cart.length === 0 ? <div className="empty-cart"><div className="empty-graphic"><ShoppingCart size={33} /></div><strong>Đơn hàng đang trống</strong><span>Quét mã hoặc tìm sản phẩm để bắt đầu bán hàng</span></div> : <div className="cart-list">{cart.map(line => <div className="cart-line" key={line.product.id}><div className="cart-product-icon"><Package size={21} /></div><div className="cart-product"><strong>{line.product.name}</strong><span>{line.product.code} · {money(line.product.salePrice)} / sản phẩm</span></div><div className="quantity-control"><button onClick={() => changeQuantity(line.product.id, line.quantity - 1)} aria-label="Giảm số lượng"><Minus size={14} /></button><span>{line.quantity}</span><button onClick={() => changeQuantity(line.product.id, line.quantity + 1)} aria-label="Tăng số lượng"><Plus size={14} /></button></div><strong className="line-total">{money(line.product.salePrice * line.quantity)}</strong><button className="remove-line" onClick={() => changeQuantity(line.product.id, 0)} aria-label="Xoá sản phẩm"><X size={17} /></button></div>)}</div>}
+          </div>
+        </div>
+
+        <aside className="order-panel panel">
+          <div className="order-panel-top"><span className="section-icon dark"><ReceiptText size={20} /></span><div><h2>Thông tin đơn hàng</h2><p>Chi tiết thanh toán</p></div></div>
+          <div className="order-fields"><label>Họ tên khách hàng <span>(không bắt buộc)</span><input value={customerName} onChange={event => setCustomerName(event.target.value)} placeholder="Nhập tên khách hàng" maxLength={120} /></label><label>Số điện thoại <span>(không bắt buộc)</span><input value={customerPhone} onChange={event => setCustomerPhone(event.target.value)} placeholder="Nhập số điện thoại" maxLength={30} inputMode="tel" /></label><label>Thời gian mua<input value={dateTime(now)} readOnly className="readonly-input" /></label></div>
+          <div className="order-summary"><div><span>Số lượng sản phẩm</span><strong>{cartCount}</strong></div><div><span>Tạm tính</span><strong>{money(cartTotal)}</strong></div><div className="total-row"><span>Tổng thanh toán</span><strong>{money(cartTotal)}</strong></div></div>
+          <button className="checkout-button" onClick={() => void checkout()} disabled={!cart.length || checkingOut}><span>{checkingOut ? 'Đang lưu đơn...' : 'Thanh toán & lưu hoá đơn'}</span><ArrowRight size={19} /></button>
+          <div className="order-footnote"><Check size={15} />Tồn kho được trừ sau khi thanh toán thành công.</div>
+          {lastInvoice && <button className="last-invoice" onClick={onShowInvoices}><ReceiptText size={17} />Đơn vừa lưu: <strong>{lastInvoice}</strong><ArrowRight size={15} /></button>}
+        </aside>
+      </div>
+    </section>
+  )
+}

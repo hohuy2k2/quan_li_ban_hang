@@ -26,6 +26,7 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<InventoryDb>();
     db.Database.EnsureCreated();
+    DatabaseSchema.EnsureReturnTables(db);
     db.Database.ExecuteSqlRaw("PRAGMA journal_mode=WAL;");
 }
 
@@ -120,18 +121,31 @@ app.MapDelete("/api/products/{id:int}", async (InventoryDb db, int id) =>
     return Results.NoContent();
 });
 
-app.MapGet("/api/history", async (InventoryDb db, int? productId) =>
+app.MapGet("/api/history", async (InventoryDb db, int? productId, string? action, string? query) =>
 {
     var history = db.ProductAudits.AsNoTracking().AsQueryable();
     if (productId.HasValue) history = history.Where(h => h.ProductId == productId.Value);
-    return Results.Ok(await history.OrderByDescending(h => h.At).Take(300).ToListAsync());
+    if (!string.IsNullOrWhiteSpace(action)) history = history.Where(h => h.Action == action);
+    if (string.IsNullOrWhiteSpace(query))
+        return Results.Ok(await history.OrderByDescending(h => h.At).Take(300).ToListAsync());
+    var term = SearchKey(query);
+    var matches = (await history.OrderByDescending(h => h.At).ToListAsync())
+        .Where(h => SearchKey($"{h.ProductCode} {h.ProductName} {h.Summary}").Contains(term)).Take(300);
+    return Results.Ok(matches);
 });
 
-app.MapGet("/api/movements", async (InventoryDb db, int? productId) =>
+app.MapGet("/api/movements", async (InventoryDb db, int? productId, string? direction, string? query) =>
 {
     var movements = db.StockMovements.AsNoTracking().AsQueryable();
     if (productId.HasValue) movements = movements.Where(m => m.ProductId == productId.Value);
-    return Results.Ok(await movements.OrderByDescending(m => m.At).Take(300).ToListAsync());
+    if (direction == "in") movements = movements.Where(m => m.Change > 0);
+    if (direction == "out") movements = movements.Where(m => m.Change < 0);
+    if (string.IsNullOrWhiteSpace(query))
+        return Results.Ok(await movements.OrderByDescending(m => m.At).Take(300).ToListAsync());
+    var term = SearchKey(query);
+    var matches = (await movements.OrderByDescending(m => m.At).ToListAsync())
+        .Where(m => SearchKey($"{m.ProductCode} {m.Reason} {m.Reference}").Contains(term)).Take(300);
+    return Results.Ok(matches);
 });
 
 app.MapPost("/api/sales", async (InventoryDb db, SaleInput input) =>
@@ -189,9 +203,33 @@ app.MapPost("/api/sales", async (InventoryDb db, SaleInput input) =>
     return Results.Created($"/api/sales/{sale.Id}", sale);
 });
 
-app.MapGet("/api/sales", async (InventoryDb db) =>
-    Results.Ok(await db.Sales.AsNoTracking().Include(s => s.Items)
-        .OrderByDescending(s => s.SoldAt).Take(200).ToListAsync()));
+app.MapGet("/api/sales", async (InventoryDb db, string? from, string? to) =>
+{
+    var sales = db.Sales.AsNoTracking().AsQueryable();
+    if (!string.IsNullOrWhiteSpace(from))
+    {
+        if (!DateOnly.TryParseExact(from, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var startDate))
+            return Results.BadRequest(new { message = "Ngày bắt đầu không hợp lệ." });
+        var start = startDate.ToDateTime(TimeOnly.MinValue).ToUniversalTime();
+        sales = sales.Where(s => s.SoldAt >= start);
+    }
+    if (!string.IsNullOrWhiteSpace(to))
+    {
+        if (!DateOnly.TryParseExact(to, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var endDate))
+            return Results.BadRequest(new { message = "Ngày kết thúc không hợp lệ." });
+        var end = endDate.AddDays(1).ToDateTime(TimeOnly.MinValue).ToUniversalTime();
+        sales = sales.Where(s => s.SoldAt < end);
+    }
+    var ordered = sales.Include(s => s.Items)
+        .Include(s => s.Returns).ThenInclude(r => r.Items).AsSplitQuery()
+        .OrderByDescending(s => s.SoldAt);
+    var result = string.IsNullOrWhiteSpace(from) && string.IsNullOrWhiteSpace(to)
+        ? await ordered.Take(200).ToListAsync()
+        : await ordered.ToListAsync();
+    return Results.Ok(result);
+});
+
+app.MapSaleManagementEndpoints();
 
 app.MapGet("/api/summary", async (InventoryDb db) =>
 {
@@ -199,6 +237,8 @@ app.MapGet("/api/summary", async (InventoryDb db) =>
     var tomorrow = DateTime.Today.AddDays(1).ToUniversalTime();
     var salesToday = await db.Sales.AsNoTracking()
         .Where(s => s.SoldAt >= today && s.SoldAt < tomorrow).ToListAsync();
+    var refundsToday = await db.SaleReturns.AsNoTracking()
+        .Where(r => r.ReturnedAt >= today && r.ReturnedAt < tomorrow).ToListAsync();
     var active = await db.Products.AsNoTracking().Where(p => !p.IsDeleted).ToListAsync();
     return Results.Ok(new
     {
@@ -206,7 +246,7 @@ app.MapGet("/api/summary", async (InventoryDb db) =>
         stockUnits = active.Sum(p => p.Quantity),
         lowStockCount = active.Count(p => p.Quantity <= p.LowStockThreshold),
         salesToday = salesToday.Count,
-        revenueToday = salesToday.Sum(s => s.Total)
+        revenueToday = salesToday.Sum(s => s.Total) - refundsToday.Sum(r => r.TotalRefund)
     });
 });
 
