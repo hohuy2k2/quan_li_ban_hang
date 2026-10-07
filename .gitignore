@@ -1,0 +1,10 @@
+work/
+frontend/node_modules/
+frontend/dist/
+backend/bin/
+backend/obj/
+backend/wwwroot/
+release/
+*.db
+*.db-shm
+*.db-wal
