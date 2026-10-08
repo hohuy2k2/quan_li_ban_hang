@@ -1,7 +1,7 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { ArrowRight } from 'lucide-react'
 import { createOrder } from '../api'
-import type { CartLine, CheckoutDetails } from '../types'
+import type { AuthUser, CartLine, CheckoutDetails } from '../types'
 import { money } from '../utils/format'
 
 type Props = {
@@ -9,6 +9,8 @@ type Props = {
   total: number
   onSuccess: (number: string) => void
   onError: (message: string) => void
+  user: AuthUser | null
+  onOpenAccount: () => void
 }
 
 const emptyDetails: CheckoutDetails = {
@@ -16,14 +18,21 @@ const emptyDetails: CheckoutDetails = {
 }
 
 /** Thu thông tin khách và gửi đơn; chỉ báo thành công khi backend đã lưu. */
-export function CheckoutForm({ lines, total, onSuccess, onError }: Props) {
-  const [details, setDetails] = useState<CheckoutDetails>(emptyDetails)
+export function CheckoutForm({ lines, total, user, onOpenAccount, onSuccess, onError }: Props) {
+  const [details, setDetails] = useState<CheckoutDetails>(() => ({ ...emptyDetails, customerName: user?.displayName ?? '', customerPhone: user?.phone ?? '' }))
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (user?.role === 'customer') setDetails(current => ({
+      ...current, customerName: current.customerName || user.displayName,
+      customerPhone: current.customerPhone || user.phone,
+    }))
+  }, [user])
 
   /** Tạo danh sách mã sản phẩm/số lượng, còn giá được backend tự tính lại. */
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!lines.length || submitting) return
+    if (!lines.length || submitting || !user || user.role !== 'customer') return
     setSubmitting(true)
     try {
       const result = await createOrder({
@@ -37,6 +46,8 @@ export function CheckoutForm({ lines, total, onSuccess, onError }: Props) {
       setSubmitting(false)
     }
   }
+
+  if (!user || user.role !== 'customer') return <div className="checkout-login"><h3>Đăng nhập để đặt hàng</h3><p>Tài khoản giúp bạn theo dõi trạng thái và xem lại những đơn đã mua.</p><button onClick={onOpenAccount}>Đăng nhập hoặc đăng ký</button></div>
 
   return <form className="checkout-form" onSubmit={event => void submit(event)}>
     <h3>Thông tin nhận hàng</h3>

@@ -1,30 +1,42 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   AlertTriangle, Barcode as BarcodeIcon, Boxes, Check, Clock3, Download,
-  FileClock, Menu, ReceiptText, RefreshCw, ShieldCheck, ShoppingCart, ClipboardList, Globe2, X,
+  FileClock, Menu, ReceiptText, RefreshCw, ShieldCheck, ShoppingCart, ClipboardList, Globe2, LogOut, ChartNoAxesCombined, Moon, Sun, UsersRound, X,
 } from 'lucide-react'
 import { api } from './api'
+import { AdminLoginPage } from './components/AdminLoginPage'
+import { useTheme } from './hooks/useTheme'
+import { AccountsPage } from './pages/AccountsPage'
 import { HistoryPage } from './pages/HistoryPage'
 import { InvoicesPage } from './pages/InvoicesPage'
 import { OnlineOrdersPage } from './pages/OnlineOrdersPage'
 import { ProductsPage } from './pages/ProductsPage'
+import { RevenuePage } from './pages/RevenuePage'
 import { SalesPage } from './pages/SalesPage'
 import { StockPage } from './pages/StockPage'
 import { WarrantyPage } from './pages/WarrantyPage'
-import type { OnlineOrder, Product, ProductAudit, Sale, StockMovement, Summary } from './types'
+import type { AuthUser, OnlineOrder, Product, ProductAudit, Sale, StockMovement, Summary } from './types'
 import { dateTime } from './utils/format'
 import './App.css'
+import './account.css'
+import './theme.css'
 
-type Page = 'sales' | 'products' | 'stock' | 'invoices' | 'onlineOrders' | 'warranty' | 'history'
+type Page = 'sales' | 'products' | 'stock' | 'invoices' | 'onlineOrders' | 'revenue' | 'warranty' | 'history' | 'accounts'
 type Toast = { message: string; kind: 'success' | 'error' }
 
 const pageTitles: Record<Page, string> = {
   sales: 'Bán hàng', products: 'Sản phẩm & tồn kho',
   stock: 'Phiếu kho', invoices: 'Hoá đơn', warranty: 'Bảo hành', history: 'Lịch sử thay đổi',
   onlineOrders: 'Đơn online',
+  revenue: 'Doanh thu',
+  accounts: 'Tài khoản',
 }
 
 function App() {
+  const { theme, toggleTheme } = useTheme()
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null)
+  const [authChecking, setAuthChecking] = useState(true)
+  const [authError, setAuthError] = useState('')
   const [page, setPage] = useState<Page>('sales')
   const [products, setProducts] = useState<Product[]>([])
   const [sales, setSales] = useState<Sale[]>([])
@@ -63,7 +75,21 @@ function App() {
     }
   }, [])
 
-  useEffect(() => { void refresh() }, [refresh])
+  useEffect(() => {
+    void api.currentUser().then(setAuthUser).catch(error =>
+      setAuthError(error instanceof Error ? error.message : 'Không kết nối được backend.'))
+      .finally(() => setAuthChecking(false))
+    const expired = () => setAuthUser(null)
+    window.addEventListener('admin-auth-expired', expired)
+    return () => window.removeEventListener('admin-auth-expired', expired)
+  }, [])
+  useEffect(() => { if (authUser?.role === 'admin') void refresh() }, [authUser, refresh])
+  useEffect(() => {
+    if (authUser?.role !== 'admin') return
+    const events = new EventSource('/api/online-orders/stream')
+    events.addEventListener('orders', () => { void refresh() })
+    return () => events.close()
+  }, [authUser, refresh])
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 30_000)
     return () => window.clearInterval(timer)
@@ -76,12 +102,12 @@ function App() {
 
   async function downloadBackup() {
     try {
-      const response = await fetch('/api/backup')
+      const response = await fetch('/api/backup/full')
       if (!response.ok) throw new Error('Không tạo được bản sao lưu.')
       const blob = await response.blob()
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
-      link.download = `quan-ly-ban-hang-${new Date().toISOString().slice(0, 10)}.db`
+      link.download = `quan-ly-ban-hang-${new Date().toISOString().slice(0, 10)}.zip`
       document.body.appendChild(link)
       link.click()
       link.remove()
@@ -97,6 +123,25 @@ function App() {
     setSidebarOpen(false)
   }
 
+  /** Chỉ tài khoản role admin mới được vào phần quản lý. */
+  async function login(email: string, password: string) {
+    const user = await api.login(email, password)
+    if (user.role !== 'admin') {
+      await api.logout()
+      throw new Error('Tài khoản này không có quyền quản lý.')
+    }
+    setAuthError('')
+    setAuthUser(user)
+  }
+
+  async function logout() {
+    try { await api.logout(); setAuthUser(null) }
+    catch (error) { showToast(error instanceof Error ? error.message : 'Không đăng xuất được.', 'error') }
+  }
+
+  if (authChecking) return <div className="loading-state">Đang kiểm tra đăng nhập...</div>
+  if (authUser?.role !== 'admin') return <AdminLoginPage onLogin={login} initialError={authError || (authUser ? 'Tài khoản khách không có quyền quản lý.' : '')} theme={theme} onToggleTheme={toggleTheme} />
+
   return (
     <>
       <div className="app-shell">
@@ -110,17 +155,19 @@ function App() {
             <button className={page === 'stock' ? 'nav-item active' : 'nav-item'} onClick={() => selectPage('stock')}><ClipboardList size={19} />Nhập kho / kiểm kê</button>
             <button className={page === 'invoices' ? 'nav-item active' : 'nav-item'} onClick={() => selectPage('invoices')}><ReceiptText size={19} />Hoá đơn</button>
             <button className={page === 'onlineOrders' ? 'nav-item active' : 'nav-item'} onClick={() => selectPage('onlineOrders')}><Globe2 size={19} />Đơn online{onlineOrders.some(o => o.status === 'pending') && <span className="nav-count">{onlineOrders.filter(o => o.status === 'pending').length}</span>}</button>
+            <button className={page === 'revenue' ? 'nav-item active' : 'nav-item'} onClick={() => selectPage('revenue')}><ChartNoAxesCombined size={19} />Doanh thu</button>
             <button className={page === 'warranty' ? 'nav-item active' : 'nav-item'} onClick={() => selectPage('warranty')}><ShieldCheck size={19} />Bảo hành</button>
             <button className={page === 'history' ? 'nav-item active' : 'nav-item'} onClick={() => selectPage('history')}><FileClock size={19} />Lịch sử thay đổi</button>
+            <button className={page === 'accounts' ? 'nav-item active' : 'nav-item'} onClick={() => selectPage('accounts')}><UsersRound size={19} />Tài khoản</button>
           </nav>
-          <div className="sidebar-bottom"><button className="backup-button" onClick={() => void downloadBackup()}><Download size={18} />Sao lưu dữ liệu</button><div className="local-note"><span className="online-dot" />Dữ liệu lưu trên máy này</div></div>
+          <div className="sidebar-bottom"><button className="backup-button" onClick={toggleTheme}>{theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}{theme === 'dark' ? 'Chế độ sáng' : 'Chế độ tối'}</button><button className="backup-button" onClick={() => void downloadBackup()}><Download size={18} />Sao lưu dữ liệu và ảnh</button><button className="backup-button" onClick={() => void logout()}><LogOut size={18} />Đăng xuất</button><div className="local-note"><span className="online-dot" />Dữ liệu lưu trên máy này</div></div>
         </aside>
 
         <main className="main-area">
           <header className="topbar">
             <button className="mobile-menu icon-button" onClick={() => setSidebarOpen(value => !value)} aria-label="Mở menu"><Menu size={21} /></button>
             <div className="breadcrumb">TỔNG QUAN <span>/</span> <strong>{pageTitles[page]}</strong></div>
-            <div className="topbar-right"><span className="top-date"><Clock3 size={16} />{dateTime(now)}</span><div className="avatar">VN</div></div>
+            <div className="topbar-right"><span className="top-date"><Clock3 size={16} />{dateTime(now)}</span><button className="theme-toggle" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối'}>{theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}</button><div className="avatar">{authUser.displayName.trim().slice(0, 2).toUpperCase()}</div></div>
           </header>
 
           {loadError && <div className="connection-error"><AlertTriangle size={18} /><span>{loadError}</span><button onClick={() => void refresh()}><RefreshCw size={15} />Thử lại</button></div>}
@@ -130,8 +177,10 @@ function App() {
             <StockPage active={page === 'stock'} products={products} onRefresh={refresh} showToast={showToast} />
             <InvoicesPage active={page === 'invoices'} sales={sales} products={products} onRefresh={refresh} showToast={showToast} />
             <OnlineOrdersPage active={page === 'onlineOrders'} orders={onlineOrders} onRefresh={refresh} showToast={showToast} />
+            <RevenuePage active={page === 'revenue'} showToast={showToast} />
             <WarrantyPage active={page === 'warranty'} products={products} onRefresh={refresh} showToast={showToast} />
             <HistoryPage active={page === 'history'} audits={audits} movements={movements} showToast={showToast} />
+            <AccountsPage active={page === 'accounts'} user={authUser} onUserChange={setAuthUser} showToast={showToast} />
           </>}
         </main>
       </div>

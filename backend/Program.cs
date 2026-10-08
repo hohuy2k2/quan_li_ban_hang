@@ -1,11 +1,30 @@
 using System.Globalization;
+using System.IO.Compression;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using System.Threading.RateLimiting;
 using InventoryApp;
+using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
+// Tải cấu hình email trong thư mục backend (hoặc release) trước khi tạo dịch vụ gửi thư.
+var mailConfigPath = new[]
+{
+    Path.Combine(builder.Environment.ContentRootPath, "mailsettings.local.json"),
+    Path.Combine(builder.Environment.ContentRootPath, "backend", "mailsettings.local.json")
+}.FirstOrDefault(File.Exists);
+if (mailConfigPath is not null)
+    builder.Configuration.AddJsonFile(mailConfigPath, optional: false, reloadOnChange: false);
+// Giữ tương thích với các máy đã cấu hình qua biến môi trường.
+builder.Configuration.AddEnvironmentVariables();
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Warning);
@@ -20,6 +39,53 @@ Directory.CreateDirectory(dataDirectory);
 var databasePath = Path.Combine(dataDirectory, "inventory.db");
 builder.Services.AddDbContext<InventoryDb>(options =>
     options.UseSqlite($"Data Source={databasePath}"));
+builder.Services.AddSingleton<IPasswordHasher<AppUser>, PasswordHasher<AppUser>>();
+builder.Services.AddSingleton<ResetEmailSender>();
+builder.Services.AddSingleton<OnlineOrderNotifier>();
+builder.Services.AddDataProtection().PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(dataDirectory, "auth-keys")));
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.Cookie.Name = "QuanLyBanHang.Auth";
+        options.Cookie.HttpOnly = true;
+        options.Cookie.SameSite = SameSiteMode.Strict;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+        options.ExpireTimeSpan = TimeSpan.FromHours(12);
+        options.SlidingExpiration = true;
+        options.Events.OnRedirectToLogin = context => { context.Response.StatusCode = 401; return Task.CompletedTask; };
+        options.Events.OnRedirectToAccessDenied = context => { context.Response.StatusCode = 403; return Task.CompletedTask; };
+        options.Events.OnValidatePrincipal = async context =>
+        {
+            var value = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+            var stamp = context.Principal?.FindFirstValue("stamp");
+            using var scope = context.HttpContext.RequestServices.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<InventoryDb>();
+            var user = int.TryParse(value, out var id)
+                ? await db.AppUsers.AsNoTracking().FirstOrDefaultAsync(u => u.Id == id) : null;
+            if (user is null || !user.IsActive || user.SecurityStamp != stamp ||
+                user.Role != context.Principal?.FindFirstValue(ClaimTypes.Role))
+            {
+                context.RejectPrincipal();
+                await context.HttpContext.SignOutAsync();
+            }
+        };
+    });
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("Customer", policy => policy.RequireAuthenticatedUser().RequireRole("customer"));
+    options.AddPolicy("Admin", policy => policy.RequireAuthenticatedUser().RequireRole("admin"));
+});
+builder.Services.AddAntiforgery(options => options.HeaderName = "X-CSRF-TOKEN");
+builder.Services.Configure<FormOptions>(options => options.MultipartBodyLengthLimit = 3 * 1024 * 1024);
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = 429;
+    options.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(
+        context.Connection.RemoteIpAddress?.ToString() ?? "local", _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 10, Window = TimeSpan.FromMinutes(1), QueueLimit = 0, AutoReplenishment = true
+        }));
+});
 
 var app = builder.Build();
 using (var scope = app.Services.CreateScope())
@@ -31,16 +97,57 @@ using (var scope = app.Services.CreateScope())
     DatabaseUpgrades.Apply(db);
     db.Database.ExecuteSqlRaw("PRAGMA journal_mode=WAL;");
 }
+if (args.Contains("--create-admin"))
+{
+    using var scope = app.Services.CreateScope();
+    await AdminSetup.Run(scope.ServiceProvider.GetRequiredService<InventoryDb>(),
+        scope.ServiceProvider.GetRequiredService<IPasswordHasher<AppUser>>());
+    return;
+}
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
+app.UseRouting();
+app.UseRateLimiter();
+app.UseAuthentication();
+app.UseAuthorization();
+app.Use(async (context, next) =>
+{
+    if (context.Request.Path.StartsWithSegments("/api"))
+    {
+        if (!HttpMethods.IsGet(context.Request.Method) && !HttpMethods.IsHead(context.Request.Method))
+        {
+            try { await context.RequestServices.GetRequiredService<IAntiforgery>().ValidateRequestAsync(context); }
+            catch (AntiforgeryValidationException)
+            {
+                context.Response.StatusCode = 400;
+                await context.Response.WriteAsJsonAsync(new { message = "Phiên bảo mật hết hạn. Hãy tải lại trang." });
+                return;
+            }
+        }
+        var isPublic = context.Request.Path.StartsWithSegments("/api/store") ||
+            context.Request.Path.StartsWithSegments("/api/auth") ||
+            context.Request.Path == "/api/health";
+        if (!isPublic && !context.User.IsInRole("admin"))
+        {
+            context.Response.StatusCode = context.User.Identity?.IsAuthenticated == true ? 403 : 401;
+            return;
+        }
+        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    }
+    await next();
+});
+app.MapAuthEndpoints();
+app.MapAccountEndpoints();
+app.MapProductMediaEndpoints(dataDirectory);
+app.MapRevenueEndpoints();
 app.MapGet("/store", () =>
 {
     var index = Path.Combine(app.Environment.WebRootPath ?? "", "store", "index.html");
     return File.Exists(index) ? Results.File(index, "text/html") : Results.NotFound();
 });
 
-app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }));
+app.MapGet("/api/health", () => Results.Ok(new { status = "ok", apiVersion = 2 }));
 
 app.MapGet("/api/products/next-code", async (InventoryDb db) =>
 {
@@ -284,6 +391,42 @@ app.MapGet("/api/backup", async () =>
     }
 });
 
+// Bản ZIP giữ cả SQLite và ảnh sản phẩm để có thể khôi phục website sau sự cố máy.
+app.MapGet("/api/backup/full", async () =>
+{
+    var temporaryDb = Path.Combine(dataDirectory, $".backup-{Guid.NewGuid():N}.db");
+    var temporaryZip = Path.Combine(dataDirectory, $".backup-{Guid.NewGuid():N}.zip");
+    try
+    {
+        await using (var source = new SqliteConnection($"Data Source={databasePath};Pooling=False"))
+        await using (var destination = new SqliteConnection($"Data Source={temporaryDb};Pooling=False"))
+        {
+            await source.OpenAsync();
+            await destination.OpenAsync();
+            source.BackupDatabase(destination);
+        }
+        await using (var output = File.Create(temporaryZip))
+        using (var archive = new ZipArchive(output, ZipArchiveMode.Create))
+        {
+            archive.CreateEntryFromFile(temporaryDb, "inventory.db", CompressionLevel.Optimal);
+            var imageDirectory = Path.Combine(dataDirectory, "product-images");
+            if (Directory.Exists(imageDirectory))
+                foreach (var image in Directory.EnumerateFiles(imageDirectory))
+                    archive.CreateEntryFromFile(image, $"product-images/{Path.GetFileName(image)}", CompressionLevel.Optimal);
+        }
+        return Results.File(await File.ReadAllBytesAsync(temporaryZip), "application/zip",
+            $"quan-ly-ban-hang-{DateTime.Now:yyyyMMdd-HHmm}.zip");
+    }
+    finally
+    {
+        if (File.Exists(temporaryDb)) File.Delete(temporaryDb);
+        if (File.Exists(temporaryZip)) File.Delete(temporaryZip);
+    }
+});
+
+// API sai đường dẫn phải trả JSON 404, không để trang React dự phòng biến lỗi thành HTML 200.
+app.MapMethods("/api/{**path}", ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
+    () => Results.NotFound(new { message = "API không tồn tại trên backend đang chạy. Hãy kiểm tra phiên bản backend và cổng 5000." }));
 if (File.Exists(Path.Combine(app.Environment.WebRootPath ?? "", "index.html")))
     app.MapFallbackToFile("index.html");
 
@@ -301,6 +444,13 @@ static string? ValidateProduct(ProductInput input)
         return "Hãng hoặc loại sản phẩm quá dài.";
     if (input.PurchasePrice < 0 || input.SalePrice < 0 || input.Quantity < 0 || input.LowStockThreshold < 0)
         return "Giá và số lượng không được âm.";
+    if (!string.IsNullOrEmpty(input.ImageUrl) &&
+        !System.Text.RegularExpressions.Regex.IsMatch(input.ImageUrl, "^/api/store/images/[a-f0-9]{32}\\.(jpg|png|webp)$"))
+        return "Đường dẫn ảnh không hợp lệ. Hãy tải ảnh bằng biểu mẫu sản phẩm.";
+    if (input.Specifications is { Count: > 30 } || input.Specifications?.Any(pair =>
+        string.IsNullOrWhiteSpace(pair.Key) || pair.Key.Length > 80 ||
+        string.IsNullOrWhiteSpace(pair.Value) || pair.Value.Length > 300) == true)
+        return "Thông số sản phẩm không hợp lệ (tối đa 30 mục).";
     return null;
 }
 
@@ -313,6 +463,8 @@ static void Apply(Product product, ProductInput input)
     product.PurchasePrice = input.PurchasePrice;
     product.PurchasePriceIncludesTax = input.PurchasePriceIncludesTax;
     product.SalePrice = input.SalePrice;
+    product.ImageUrl = input.ImageUrl ?? "";
+    product.SpecificationsJson = JsonSerializer.Serialize(input.Specifications ?? []);
     product.Quantity = input.Quantity;
     product.LowStockThreshold = input.LowStockThreshold;
     product.SearchText = SearchKey($"{product.Code} {product.Name} {product.Brand} {product.Category}");
@@ -333,7 +485,8 @@ static string SearchKey(string value)
 static object Snapshot(Product p) => new
 {
     p.Code, p.Name, p.Brand, p.Category, p.PurchasePrice,
-    p.PurchasePriceIncludesTax, p.SalePrice, p.Quantity, p.LowStockThreshold
+    p.PurchasePriceIncludesTax, p.SalePrice, p.Quantity, p.LowStockThreshold,
+    p.ImageUrl, p.SpecificationsJson
 };
 
 static ProductAudit Audit(Product p, string action, string summary, object? before, object? after) => new()

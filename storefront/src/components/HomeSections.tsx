@@ -47,7 +47,7 @@ export function ClosingCallout({ onOpenCart }: { onOpenCart: () => void }) {
 /** Thông tin cố định ở chân trang. */
 export function SiteFooter() {
   return <footer><div className="site-container footer-inner">
-    <div className="footer-brand"><Zap size={19} fill="currentColor" /> CỬA HÀNG ĐỒ ĐIỆN</div>
-    <span>Đơn đặt hàng được xác nhận qua điện thoại.</span>
+    <div className="footer-brand"><Zap size={19} fill="currentColor" /> ĐỒ ĐIỆN VIỆT THU</div>
+    <span>© {new Date().getFullYear()} Đồ điện Việt Thu. Bảo lưu mọi quyền.</span>
   </div></footer>
 }

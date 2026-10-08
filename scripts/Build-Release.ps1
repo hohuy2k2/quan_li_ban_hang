@@ -25,6 +25,10 @@ try {
 
     dotnet publish (Join-Path $projectRoot 'backend\backend.csproj') -c Release -r win-x64 --self-contained true -o (Join-Path $projectRoot 'release')
     if ($LASTEXITCODE -ne 0) { throw 'Không đóng gói được backend.' }
+    $mailSettings = Join-Path $projectRoot 'backend\mailsettings.local.json'
+    if (Test-Path -LiteralPath $mailSettings) {
+        Copy-Item -LiteralPath $mailSettings -Destination (Join-Path $projectRoot 'release\mailsettings.local.json') -Force
+    }
     Write-Host 'Đã tạo bản chạy tại thư mục release.'
 }
 finally { Pop-Location }

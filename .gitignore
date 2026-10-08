@@ -4,6 +4,7 @@ frontend/dist/
 backend/bin/
 backend/obj/
 backend/wwwroot/
+backend/mailsettings.local.json
 release/
 *.db
 *.db-shm

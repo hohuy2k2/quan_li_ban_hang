@@ -1,26 +1,93 @@
-import type { OnlineOrder, Product, ProductAudit, ProductInput, ReturnInput, Sale, SaleInput, SaleReturn, SaleReturnItem, StockMovement, StockDocument, StockDocumentInput, Summary, WarrantyCase, WarrantyStatus } from './types'
+import type { Account, AccountDetails, AuthUser, OnlineOrder, Product, ProductAudit, ProductInput, ReturnInput, RevenueReport, Sale, SaleInput, SaleReturn, SaleReturnItem, StockMovement, StockDocument, StockDocumentInput, Summary, WarrantyCase, WarrantyStatus } from './types'
+
+let csrfPromise: Promise<string> | null = null
+
+/** Báo rõ khi trang HTML (thường từ backend cũ hoặc sai cổng) bị trả về thay cho API. */
+async function readJson<T>(response: Response, path: string): Promise<T> {
+  const contentType = response.headers.get('content-type')?.toLowerCase() ?? ''
+  if (!contentType.includes('json'))
+    throw new Error(`API ${path} trả về HTML thay vì dữ liệu. Hãy kiểm tra backend ở cổng 5000 và đường dẫn API.`)
+  try { return await response.json() as T }
+  catch { throw new Error('Dữ liệu API không hợp lệ. Hãy khởi động lại backend và tải lại trang.') }
+}
+
+/** Lấy token chống giả mạo cho các thao tác ghi dùng cookie đăng nhập. */
+function csrfToken(): Promise<string> {
+  csrfPromise ??= fetch('/api/auth/csrf').then(async response => {
+    if (!response.ok) throw new Error('Không tạo được phiên bảo mật.')
+    const body = await readJson<{ token?: string }>(response, '/api/auth/csrf')
+    if (!body.token) throw new Error('Backend chưa hỗ trợ đăng nhập. Hãy chạy phiên bản backend mới.')
+    return body.token
+  }).catch(error => { csrfPromise = null; throw error })
+  return csrfPromise
+}
 
 // Mọi lời gọi backend đi qua đây để thống nhất xử lý lỗi và thông báo cho người dùng.
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   let response: Response
+  const headers = new Headers(options?.headers)
+  if (options?.body && !(options.body instanceof FormData)) headers.set('Content-Type', 'application/json')
+  if (options?.method && !['GET', 'HEAD'].includes(options.method.toUpperCase()))
+    headers.set('X-CSRF-TOKEN', await csrfToken())
   try {
     response = await fetch(`/api${path}`, {
       ...options,
-      headers: { 'Content-Type': 'application/json', ...options?.headers },
+      headers,
     })
   } catch {
     throw new Error('Không kết nối được với ứng dụng. Hãy kiểm tra phần mềm đã khởi động.')
   }
   if (!response.ok) {
-    const body = await response.json().catch(() => ({}))
+    if (response.status === 401) window.dispatchEvent(new Event('admin-auth-expired'))
+    const body: { message?: string } = response.headers.get('content-type')?.includes('json')
+      ? await response.json().catch(() => ({})) as { message?: string } : {}
     throw new Error(body.message ?? `Có lỗi xảy ra (${response.status}).`)
   }
   if (response.status === 204) return undefined as T
-  return response.json() as Promise<T>
+  return readJson<T>(response, `/api${path}`)
 }
 
 export const api = {
+  currentUser: async (): Promise<AuthUser | null> => {
+    let response: Response
+    try { response = await fetch('/api/auth/me') }
+    catch { throw new Error('Không kết nối được backend ở cổng 5000.') }
+    if (response.status === 401) return null
+    if (!response.ok) throw new Error('Không kiểm tra được phiên đăng nhập.')
+    return readJson<AuthUser>(response, '/api/auth/me')
+  },
+  login: async (email: string, password: string) => {
+    const user = await request<AuthUser>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) })
+    csrfPromise = null
+    return user
+  },
+  logout: async () => {
+    await request<void>('/auth/logout', { method: 'POST' })
+    csrfPromise = null
+  },
+  updateProfile: async (data: { displayName: string; email: string; phone: string }) => {
+    const user = await request<AuthUser>('/auth/profile', { method: 'PUT', body: JSON.stringify(data) })
+    csrfPromise = null
+    return user
+  },
+  changePassword: async (currentPassword: string, newPassword: string) => {
+    await request<void>('/auth/password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) })
+    csrfPromise = null
+  },
+  accounts: () => request<Account[]>('/accounts'),
+  createAccount: (data: AccountDetails & { password: string }) =>
+    request<Account>('/accounts', { method: 'POST', body: JSON.stringify(data) }),
+  updateAccount: (id: number, data: AccountDetails) =>
+    request<Account>(`/accounts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  resetAccountPassword: (id: number, newPassword: string) =>
+    request<void>(`/accounts/${id}/password`, { method: 'POST', body: JSON.stringify({ newPassword }) }),
   products: () => request<Product[]>('/products'),
+  uploadImage: async (file: File) => {
+    const form = new FormData()
+    form.append('image', file)
+    return request<{ imageUrl: string }>('/product-images', { method: 'POST', body: form })
+  },
+  revenue: (from: string, to: string) => request<RevenueReport>(`/revenue?${new URLSearchParams({ from, to })}`),
   onlineOrders: () => request<OnlineOrder[]>('/online-orders'),
   confirmOnlineOrder: (id: number) => request<OnlineOrder>(`/online-orders/${id}/confirm`, { method: 'POST' }),
   cancelOnlineOrder: (id: number) => request<OnlineOrder>(`/online-orders/${id}/cancel`, { method: 'POST' }),

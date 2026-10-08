@@ -1,0 +1,28 @@
+/* Ghi đè màu của giao diện quản lý khi người dùng chọn chế độ tối. */
+@media screen {
+:root[data-theme='dark'] { color-scheme: dark; background: #0b1320; color: #e4eaf2; }
+:root[data-theme='dark'] body,
+:root[data-theme='dark'] .main-area { background: #0b1320; }
+:root[data-theme='dark'] .sidebar { background: #0a172a; }
+:root[data-theme='dark'] .topbar,
+:root[data-theme='dark'] .panel,
+:root[data-theme='dark'] .modal,
+:root[data-theme='dark'] .admin-login-card,
+:root[data-theme='dark'] .pagination,
+:root[data-theme='dark'] .suggestions,
+:root[data-theme='dark'] .invoice-edit-suggestions { background: #172438; border-color: #304157; color: #e4eaf2; }
+:root[data-theme='dark'] .admin-login-page { background: linear-gradient(145deg, #0b1729, #16263a); }
+:root[data-theme='dark'] :is(h1, h2, h3, .breadcrumb strong, .panel-heading h2, .order-panel h2, .data-table td strong, .pagination strong, .account-settings-card h2, .account-reset h3) { color: #e8eef6; }
+:root[data-theme='dark'] :is(.page-heading p, .data-table td, .top-date, .account-settings-card label, .account-editor-form label, .account-reset p) { color: #b0bed0; }
+:root[data-theme='dark'] :is(input, select, textarea, .search-field, .scan-form, .day-pill, .secondary-button, .theme-toggle, .login-theme-toggle, .pagination button) { background: #101b2c; border-color: #38506a; color: #e4eaf2; }
+:root[data-theme='dark'] :is(input, textarea)::placeholder { color: #8395ab; }
+:root[data-theme='dark'] .data-table th { background: #1e3048; color: #aab9ca; border-color: #304157; }
+:root[data-theme='dark'] :is(.data-table td, .modal-footer, .account-reset, .pagination, .topbar) { border-color: #304157; }
+:root[data-theme='dark'] .data-table tbody tr:hover,
+:root[data-theme='dark'] .suggestions button:hover { background: #233650; }
+:root[data-theme='dark'] :is(.suggestions button, .invoice-edit-suggestions button, .quantity-control button) { background: #172438; color: #e4eaf2; border-color: #304157; }
+:root[data-theme='dark'] :is(.revenue-summary > div, .invoice-return, .online-order-lines, .account-settings-card, .account-editor) { border-color: #304157; }
+:root[data-theme='dark'] :is(.online-order-lines > div, .revenue-group, .order-fields .readonly-input) { background: #1e3048; color: #d6e0ec; }
+:root[data-theme='dark'] .revenue-group button.selected { background: #344d70; color: #fff; }
+:root[data-theme='dark'] .admin-login-card p { color: #b0bed0; }
+}

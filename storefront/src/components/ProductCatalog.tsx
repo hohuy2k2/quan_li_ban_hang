@@ -14,26 +14,30 @@ type Props = {
   onCategoryChange: (value: string) => void
   onReload: () => void
   onAdd: (product: Product) => void
+  onView: (product: Product) => void
+  onBuyNow: (product: Product) => void
 }
 
 /** Chọn đúng nội dung cho ba trạng thái tải, lỗi và kết quả tìm kiếm. */
-function CatalogResults({ loading, error, visible, onReload, onAdd }: {
+function CatalogResults({ loading, error, visible, onReload, onAdd, onView, onBuyNow }: {
   loading: boolean
   error: string
   visible: Product[]
   onReload: () => void
   onAdd: Props['onAdd']
+  onView: Props['onView']
+  onBuyNow: Props['onBuyNow']
 }) {
   if (loading) return <div className="catalog-state">Đang tải sản phẩm...</div>
   if (error) return <div className="catalog-state error">{error}<button onClick={onReload}>Thử lại</button></div>
   if (!visible.length) return <div className="catalog-state">Chưa tìm thấy sản phẩm phù hợp.</div>
 
   return <div className="product-grid">{visible.map((product, index) =>
-    <ProductCard key={product.id} product={product} tone={index % 4} onAdd={onAdd} />)}</div>
+    <ProductCard key={product.id} product={product} tone={index % 4} onAdd={onAdd} onView={onView} onBuyNow={onBuyNow} />)}</div>
 }
 
 /** Lọc theo loại và từ khoá, rồi hiển thị danh mục sản phẩm. */
-export function ProductCatalog({ products, loading, error, query, category, onQueryChange, onCategoryChange, onReload, onAdd }: Props) {
+export function ProductCatalog({ products, loading, error, query, category, onQueryChange, onCategoryChange, onReload, onAdd, onView, onBuyNow }: Props) {
   const categories = useMemo(() => [
     'Tất cả', ...new Set(products.map(product => product.category.trim()).filter(Boolean)),
   ], [products])
@@ -56,6 +60,6 @@ export function ProductCatalog({ products, loading, error, query, category, onQu
     <div className="category-list" aria-label="Loại sản phẩm">
       {categories.map(item => <button key={item} className={category === item ? 'selected' : ''} onClick={() => onCategoryChange(item)}>{item}</button>)}
     </div>
-    <CatalogResults loading={loading} error={error} visible={visible} onReload={onReload} onAdd={onAdd} />
+    <CatalogResults loading={loading} error={error} visible={visible} onReload={onReload} onAdd={onAdd} onView={onView} onBuyNow={onBuyNow} />
   </div></section>
 }

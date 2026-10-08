@@ -1,0 +1,54 @@
+/* Màu tối áp dụng cho cửa hàng, giỏ hàng, chi tiết và tài khoản. */
+@media screen {
+:root[data-theme='dark'] { color-scheme: dark; background: #0c1723; color: #e6eef3; }
+:root[data-theme='dark'] body,
+:root[data-theme='dark'] .site-shell { background: #0c1723; }
+:root[data-theme='dark'] .site-header { background: rgba(17, 35, 49, .97); border-color: #2c4959; }
+:root[data-theme='dark'] .logo,
+:root[data-theme='dark'] .header-inner nav,
+:root[data-theme='dark'] .section-heading h2,
+:root[data-theme='dark'] .product-info h3,
+:root[data-theme='dark'] .product-bottom strong,
+:root[data-theme='dark'] .detail-content h2,
+:root[data-theme='dark'] .detail-price,
+:root[data-theme='dark'] .account-head h2 { color: #e6eef3; }
+:root[data-theme='dark'] .account-trigger,
+:root[data-theme='dark'] .site-theme-toggle,
+:root[data-theme='dark'] .category-list button,
+:root[data-theme='dark'] .catalog-search,
+:root[data-theme='dark'] .product-card,
+:root[data-theme='dark'] .benefits,
+:root[data-theme='dark'] .closing,
+:root[data-theme='dark'] .cart-drawer,
+:root[data-theme='dark'] .detail-modal,
+:root[data-theme='dark'] .account-modal { background: #172b39; border-color: #355061; color: #e6eef3; }
+:root[data-theme='dark'] .site-theme-toggle { color: #e6eef3; }
+:root[data-theme='dark'] .catalog-search input,
+:root[data-theme='dark'] .checkout-form input:not([type='radio']),
+:root[data-theme='dark'] .checkout-form textarea,
+:root[data-theme='dark'] .account-form input { background: #0e2230; border-color: #385566; color: #e6eef3; }
+:root[data-theme='dark'] :is(.product-info p, .detail-meta, .detail-specs dt, .account-muted, .account-form p, .checkout-note, .section-heading p) { color: #aebfc9; }
+:root[data-theme='dark'] :is(.drawer-head h2, .drawer-empty h3, .order-success h3, .checkout-form h3, .checkout-login h3, .line-main strong, .account-body h3, .account-orders article > div:first-child) { color: #e6eef3; }
+:root[data-theme='dark'] :is(.drawer-head, .drawer-line, .checkout-form, .account-head, .account-orders article, .detail-specs, .detail-specs > div) { border-color: #355061; }
+:root[data-theme='dark'] .account-orders article { background: #102331; }
+:root[data-theme='dark'] .fulfillment label,
+:root[data-theme='dark'] .account-tabs button,
+:root[data-theme='dark'] .detail-close { background: #102331; border-color: #355061; color: #dce8ee; }
+:root[data-theme='dark'] .account-tabs button.selected,
+:root[data-theme='dark'] .category-list button.selected { background: #2b6273; color: #fff; }
+:root[data-theme='dark'] .closing p,
+:root[data-theme='dark'] .benefits p { color: #b2c3cb; }
+:root[data-theme='dark'] .detail-image { background: #203a49; }
+:root[data-theme='dark'] .checkout-form { border-top-color: #203a49; }
+:root[data-theme='dark'] .benefit-icon,
+:root[data-theme='dark'] .line-image,
+:root[data-theme='dark'] .detail-actions button:first-child { background: #244456; color: #bfe3ea; }
+:root[data-theme='dark'] .closing > div > span { background: #244456; }
+:root[data-theme='dark'] .product-code { background: #17394bcf; color: #edf5f7; }
+:root[data-theme='dark'] .product-title { color: #e6eef3; }
+:root[data-theme='dark'] .site-theme-toggle:hover,
+:root[data-theme='dark'] .account-trigger:hover { background: #264456; }
+
+:root[data-theme='dark'] .account-form > .account-text-button { background: transparent; color: #8ad4db; }
+:root[data-theme='dark'] .account-success { background: #173b35; color: #a4e0c6; }
+}

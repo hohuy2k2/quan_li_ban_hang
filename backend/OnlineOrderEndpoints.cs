@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 
 namespace InventoryApp;
@@ -13,21 +15,51 @@ public static class OnlineOrderEndpoints
                 .OrderBy(p => p.Name)
                 .Select(p => new
                 {
-                    p.Id, p.Code, p.Name, p.Brand, p.Category, p.SalePrice,
+                    p.Id, p.Code, p.Name, p.Brand, p.Category, p.SalePrice, p.ImageUrl, p.SpecificationsJson,
                     Available = p.Quantity > 0
                 }).ToListAsync();
-            return Results.Ok(products);
+            return Results.Ok(products.Select(p => new
+            {
+                p.Id, p.Code, p.Name, p.Brand, p.Category, p.SalePrice, p.ImageUrl, p.Available,
+                specifications = JsonSerializer.Deserialize<Dictionary<string, string>>(p.SpecificationsJson) ?? []
+            }));
         });
 
-        app.MapPost("/api/store/orders", CreateOrder);
+        app.MapPost("/api/store/orders", CreateOrder).RequireAuthorization("Customer");
+        app.MapGet("/api/store/orders/mine", async (InventoryDb db, ClaimsPrincipal principal) =>
+        {
+            var userId = int.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            return Results.Ok(await db.OnlineOrders.AsNoTracking().Include(o => o.Items)
+                .Where(o => o.CustomerUserId == userId)
+                .OrderByDescending(o => o.CreatedAt).ToListAsync());
+        }).RequireAuthorization("Customer");
         app.MapGet("/api/online-orders", async (InventoryDb db) =>
             Results.Ok(await db.OnlineOrders.AsNoTracking().Include(o => o.Items)
                 .OrderByDescending(o => o.CreatedAt).ToListAsync()));
+        app.MapGet("/api/online-orders/stream", async (HttpContext context, OnlineOrderNotifier notifier) =>
+        {
+            context.Response.ContentType = "text/event-stream";
+            context.Response.Headers.CacheControl = "no-cache";
+            context.Response.Headers["X-Accel-Buffering"] = "no";
+            var (id, reader) = notifier.Subscribe();
+            try
+            {
+                await context.Response.WriteAsync(": connected\n\n", context.RequestAborted);
+                await context.Response.Body.FlushAsync(context.RequestAborted);
+                await foreach (var _ in reader.ReadAllAsync(context.RequestAborted))
+                {
+                    await context.Response.WriteAsync("event: orders\ndata: updated\n\n", context.RequestAborted);
+                    await context.Response.Body.FlushAsync(context.RequestAborted);
+                }
+            }
+            catch (OperationCanceledException) { }
+            finally { notifier.Unsubscribe(id); }
+        });
         app.MapPost("/api/online-orders/{id:int}/confirm", ConfirmOrder);
         app.MapPost("/api/online-orders/{id:int}/cancel", CancelOrder);
     }
 
-    private static async Task<IResult> CreateOrder(InventoryDb db, OnlineOrderInput input)
+    private static async Task<IResult> CreateOrder(InventoryDb db, ClaimsPrincipal principal, OnlineOrderNotifier notifier, OnlineOrderInput input)
     {
         var name = input.CustomerName?.Trim() ?? "";
         var phone = input.CustomerPhone?.Trim() ?? "";
@@ -54,6 +86,7 @@ public static class OnlineOrderEndpoints
         {
             Number = $"OD-{DateTime.Now:yyMMdd}-{Guid.NewGuid().ToString("N")[..6].ToUpperInvariant()}",
             CustomerName = name, CustomerPhone = phone,
+            CustomerUserId = int.Parse(principal.FindFirstValue(ClaimTypes.NameIdentifier)!),
             Fulfillment = fulfillment, Address = address, Note = note,
             CreatedAt = DateTime.UtcNow
         };
@@ -72,10 +105,11 @@ public static class OnlineOrderEndpoints
         }
         db.OnlineOrders.Add(order);
         await db.SaveChangesAsync();
+        notifier.Publish();
         return Results.Created($"/api/store/orders/{order.Id}", new { order.Number, order.Total });
     }
 
-    private static async Task<IResult> ConfirmOrder(InventoryDb db, int id)
+    private static async Task<IResult> ConfirmOrder(InventoryDb db, OnlineOrderNotifier notifier, int id)
     {
         await using var transaction = await db.Database.BeginTransactionAsync();
         var order = await db.OnlineOrders.Include(o => o.Items).FirstOrDefaultAsync(o => o.Id == id);
@@ -123,10 +157,11 @@ public static class OnlineOrderEndpoints
         order.SaleId = sale.Id;
         await db.SaveChangesAsync();
         await transaction.CommitAsync();
+        notifier.Publish();
         return Results.Ok(order);
     }
 
-    private static async Task<IResult> CancelOrder(InventoryDb db, int id)
+    private static async Task<IResult> CancelOrder(InventoryDb db, OnlineOrderNotifier notifier, int id)
     {
         var now = DateTime.UtcNow;
         var changed = await db.OnlineOrders.Where(o => o.Id == id && o.Status == "pending")
@@ -137,6 +172,7 @@ public static class OnlineOrderEndpoints
             return await db.OnlineOrders.AnyAsync(o => o.Id == id)
                 ? Results.Conflict(new { message = "Chỉ huỷ được đơn chưa xác nhận." })
                 : Results.NotFound(new { message = "Không tìm thấy đơn online." });
+        notifier.Publish();
         return Results.Ok(await db.OnlineOrders.Include(o => o.Items).FirstAsync(o => o.Id == id));
     }
 }

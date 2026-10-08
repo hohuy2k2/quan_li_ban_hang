@@ -7,13 +7,27 @@ export interface Product {
   purchasePrice: number
   purchasePriceIncludesTax: boolean
   salePrice: number
+  imageUrl: string
+  specificationsJson: string
   quantity: number
   lowStockThreshold: number
   createdAt: string
   updatedAt: string
 }
 
-export type ProductInput = Omit<Product, 'id' | 'createdAt' | 'updatedAt'>
+export type ProductInput = Omit<Product, 'id' | 'createdAt' | 'updatedAt' | 'specificationsJson'> & {
+  specifications: Record<string, string>
+}
+
+export type AuthUser = { id: number; displayName: string; email: string; phone: string; role: 'admin' | 'customer' }
+export type Account = AuthUser & { isActive: boolean; createdAt: string }
+export type AccountDetails = Pick<Account, 'displayName' | 'email' | 'phone' | 'role' | 'isActive'>
+
+export type RevenueRow = { period: string; sales: number; refunds: number; revenue: number; orders: number }
+export type RevenueReport = {
+  from: string; to: string; sales: number; refunds: number; revenue: number; orders: number
+  days: RevenueRow[]; months: RevenueRow[]
+}
 
 export type StockDocumentKind = 'receipt' | 'count'
 export interface StockDocumentLine {

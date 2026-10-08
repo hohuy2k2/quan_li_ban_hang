@@ -112,6 +112,8 @@ public static class DatabaseUpgrades
             CREATE INDEX IF NOT EXISTS "IX_WarrantyUnits_WarrantyCaseId" ON "WarrantyUnits" ("WarrantyCaseId");
             """);
         AddWarrantyColumn(db, "ExpectedReturnOn");
+        AddColumnIfMissing(db, "Products", "ImageUrl", "TEXT NOT NULL DEFAULT ''");
+        AddColumnIfMissing(db, "Products", "SpecificationsJson", "TEXT NOT NULL DEFAULT '{}'");
 
         // Đơn website được thêm vào DB cũ mà không cần xoá dữ liệu đang có.
         db.Database.ExecuteSqlRaw("""
@@ -135,6 +137,23 @@ public static class DatabaseUpgrades
             CREATE UNIQUE INDEX IF NOT EXISTS "IX_OnlineOrders_Number" ON "OnlineOrders" ("Number");
             CREATE INDEX IF NOT EXISTS "IX_OnlineOrderItems_OnlineOrderId" ON "OnlineOrderItems" ("OnlineOrderId");
             """);
+        AddColumnIfMissing(db, "OnlineOrders", "CustomerUserId", "INTEGER NULL");
+        db.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_OnlineOrders_CustomerUserId" ON "OnlineOrders" ("CustomerUserId");
+            CREATE TABLE IF NOT EXISTS "AppUsers" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_AppUsers" PRIMARY KEY AUTOINCREMENT,
+                "Email" TEXT NOT NULL, "NormalizedEmail" TEXT NOT NULL,
+                "DisplayName" TEXT NOT NULL, "Phone" TEXT NOT NULL,
+                "PasswordHash" TEXT NOT NULL, "SecurityStamp" TEXT NOT NULL,
+                "Role" TEXT NOT NULL, "CreatedAt" TEXT NOT NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_AppUsers_NormalizedEmail" ON "AppUsers" ("NormalizedEmail");
+            """);
+        AddColumnIfMissing(db, "AppUsers", "IsActive", "INTEGER NOT NULL DEFAULT 1");
+        AddColumnIfMissing(db, "AppUsers", "ResetCodeProtected", "TEXT NOT NULL DEFAULT ''");
+        AddColumnIfMissing(db, "AppUsers", "ResetCodeExpiresAt", "TEXT NULL");
+        AddColumnIfMissing(db, "AppUsers", "ResetCodeRequestedAt", "TEXT NULL");
+        AddColumnIfMissing(db, "AppUsers", "ResetCodeAttempts", "INTEGER NOT NULL DEFAULT 0");
 
         // Existing warranty returns become visible in the new warranty page.
         db.Database.ExecuteSqlRaw("""
@@ -179,6 +198,34 @@ public static class DatabaseUpgrades
             {
                 if (name != "ExpectedReturnOn") throw new ArgumentOutOfRangeException(nameof(name));
                 db.Database.ExecuteSqlRaw("ALTER TABLE \"WarrantyCases\" ADD COLUMN \"ExpectedReturnOn\" TEXT NOT NULL DEFAULT '';");
+            }
+        }
+        finally
+        {
+            if (openedHere) connection.Close();
+        }
+    }
+
+    private static void AddColumnIfMissing(InventoryDb db, string table, string column, string definition)
+    {
+        var connection = db.Database.GetDbConnection();
+        var openedHere = connection.State != System.Data.ConnectionState.Open;
+        if (openedHere) connection.Open();
+        try
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = $"PRAGMA table_info(\"{table}\");";
+            using var reader = command.ExecuteReader();
+            var exists = false;
+            while (reader.Read())
+                if (reader.GetString(1) == column) exists = true;
+            reader.Close();
+            if (!exists)
+            {
+                // ExecuteSqlRaw coi dấu { } trong DEFAULT '{}' là chỗ định dạng tham số.
+                // Các tên bảng/cột/kiểu chỉ đến từ hằng số nội bộ nên chạy trực tiếp trên kết nối.
+                command.CommandText = $"ALTER TABLE \"{table}\" ADD COLUMN \"{column}\" {definition};";
+                command.ExecuteNonQuery();
             }
         }
         finally

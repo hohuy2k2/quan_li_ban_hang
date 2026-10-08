@@ -21,7 +21,14 @@ type Props = {
 const blankProduct = (code = ''): ProductInput => ({
   code, name: '', brand: '', category: '', purchasePrice: 0,
   purchasePriceIncludesTax: false, salePrice: 0, quantity: 0, lowStockThreshold: 5,
+  imageUrl: '', specifications: {},
 })
+
+/** Chuyển thông số từ DB thành các ô sửa được, kể cả với dữ liệu cũ. */
+function readSpecifications(json: string): Record<string, string> {
+  try { return JSON.parse(json) as Record<string, string> }
+  catch { return {} }
+}
 
 /** Danh mục sản phẩm: lọc, phân trang, sửa hàng và in tem. */
 export function ProductsPage({ active, products, summary, onlyLowStock, onToggleLowStock, onRefresh, showToast }: Props) {
@@ -61,6 +68,7 @@ export function ProductsPage({ active, products, summary, onlyLowStock, onToggle
       code: product.code, name: product.name, brand: product.brand, category: product.category,
       purchasePrice: product.purchasePrice, purchasePriceIncludesTax: product.purchasePriceIncludesTax,
       salePrice: product.salePrice, quantity: product.quantity, lowStockThreshold: product.lowStockThreshold,
+      imageUrl: product.imageUrl, specifications: readSpecifications(product.specificationsJson),
     })
     setShowForm(true)
   }

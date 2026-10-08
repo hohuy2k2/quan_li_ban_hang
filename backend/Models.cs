@@ -13,6 +13,8 @@ public sealed class Product
     public long PurchasePrice { get; set; }
     public bool PurchasePriceIncludesTax { get; set; }
     public long SalePrice { get; set; }
+    public string ImageUrl { get; set; } = "";
+    public string SpecificationsJson { get; set; } = "{}";
     public int Quantity { get; set; }
     public int LowStockThreshold { get; set; } = 5;
     public bool IsDeleted { get; set; }
@@ -109,8 +111,28 @@ public sealed class OnlineOrder
     public DateTime CreatedAt { get; set; }
     public DateTime? ProcessedAt { get; set; }
     public int? SaleId { get; set; }
+    public int? CustomerUserId { get; set; }
     public long Total { get; set; }
     public List<OnlineOrderItem> Items { get; set; } = [];
+}
+
+// Một bảng tài khoản dùng cho quản trị viên và khách, phân quyền bằng Role.
+public sealed class AppUser
+{
+    public int Id { get; set; }
+    public string Email { get; set; } = "";
+    public string NormalizedEmail { get; set; } = "";
+    public string DisplayName { get; set; } = "";
+    public string Phone { get; set; } = "";
+    public string PasswordHash { get; set; } = "";
+    public string SecurityStamp { get; set; } = "";
+    public string Role { get; set; } = "customer";
+    public bool IsActive { get; set; } = true;
+    public DateTime CreatedAt { get; set; }
+    public string ResetCodeProtected { get; set; } = "";
+    public DateTime? ResetCodeExpiresAt { get; set; }
+    public DateTime? ResetCodeRequestedAt { get; set; }
+    public int ResetCodeAttempts { get; set; }
 }
 
 public sealed class OnlineOrderItem
@@ -205,6 +227,7 @@ public sealed class InventoryDb(DbContextOptions<InventoryDb> options) : DbConte
     public DbSet<SaleItem> SaleItems => Set<SaleItem>();
     public DbSet<OnlineOrder> OnlineOrders => Set<OnlineOrder>();
     public DbSet<OnlineOrderItem> OnlineOrderItems => Set<OnlineOrderItem>();
+    public DbSet<AppUser> AppUsers => Set<AppUser>();
     public DbSet<SaleReturn> SaleReturns => Set<SaleReturn>();
     public DbSet<SaleReturnItem> SaleReturnItems => Set<SaleReturnItem>();
     public DbSet<WarrantyCase> WarrantyCases => Set<WarrantyCase>();
@@ -221,6 +244,8 @@ public sealed class InventoryDb(DbContextOptions<InventoryDb> options) : DbConte
         modelBuilder.Entity<Sale>().HasMany(s => s.Items).WithOne().HasForeignKey(i => i.SaleId);
         modelBuilder.Entity<OnlineOrder>().HasIndex(o => o.Number).IsUnique();
         modelBuilder.Entity<OnlineOrder>().HasMany(o => o.Items).WithOne().HasForeignKey(i => i.OnlineOrderId);
+        modelBuilder.Entity<OnlineOrder>().HasIndex(o => o.CustomerUserId);
+        modelBuilder.Entity<AppUser>().HasIndex(u => u.NormalizedEmail).IsUnique();
         modelBuilder.Entity<Sale>().HasMany(s => s.Returns).WithOne().HasForeignKey(r => r.SaleId);
         modelBuilder.Entity<SaleReturn>().HasIndex(r => r.Number).IsUnique();
         modelBuilder.Entity<SaleReturn>().HasMany(r => r.Items).WithOne().HasForeignKey(i => i.SaleReturnId);
@@ -243,7 +268,9 @@ public sealed record ProductInput(
     bool PurchasePriceIncludesTax,
     long SalePrice,
     int Quantity,
-    int LowStockThreshold);
+    int LowStockThreshold,
+    string? ImageUrl = null,
+    Dictionary<string, string>? Specifications = null);
 
 public sealed record StockDocumentLineInput(int ProductId, int Quantity, long? PurchasePrice, bool? PurchasePriceIncludesTax);
 public sealed record StockDocumentInput(string Kind, string DocumentDate, string? Supplier, string? Reason, List<StockDocumentLineInput> Items);
