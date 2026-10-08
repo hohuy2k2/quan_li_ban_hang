@@ -15,6 +15,36 @@ export interface Product {
 
 export type ProductInput = Omit<Product, 'id' | 'createdAt' | 'updatedAt'>
 
+export type StockDocumentKind = 'receipt' | 'count'
+export interface StockDocumentLine {
+  id: number
+  productId: number
+  productCode: string
+  productName: string
+  quantityBefore: number
+  quantityChange: number
+  quantityAfter: number
+  purchasePrice: number | null
+  purchasePriceIncludesTax: boolean | null
+}
+export interface StockDocument {
+  id: number
+  number: string
+  kind: StockDocumentKind
+  documentDate: string
+  supplier: string
+  reason: string
+  createdAt: string
+  lines: StockDocumentLine[]
+}
+export interface StockDocumentInput {
+  kind: StockDocumentKind
+  documentDate: string
+  supplier: string
+  reason: string
+  items: { productId: number; quantity: number; purchasePrice: number | null; purchasePriceIncludesTax: boolean | null }[]
+}
+
 export interface SaleItem {
   id: number
   productId: number
@@ -116,6 +146,13 @@ export interface WarrantyEvent {
   at: string
 }
 
+export interface WarrantyUnit {
+  id: number
+  warrantyCaseId: number
+  serialNumber: string
+  warrantyExpiresOn: string
+}
+
 export interface WarrantyCase {
   id: number
   number: string
@@ -130,9 +167,11 @@ export interface WarrantyCase {
   customerPhone: string
   issue: string
   partner: string
+  expectedReturnOn: string
   status: WarrantyStatus
   createdAt: string
   updatedAt: string
   completedAt: string | null
   events: WarrantyEvent[]
+  units: WarrantyUnit[]
 }

@@ -1,4 +1,4 @@
-import type { Product, ProductAudit, ProductInput, ReturnInput, Sale, SaleInput, SaleReturn, SaleReturnItem, StockMovement, Summary, WarrantyCase, WarrantyStatus } from './types'
+import type { Product, ProductAudit, ProductInput, ReturnInput, Sale, SaleInput, SaleReturn, SaleReturnItem, StockMovement, StockDocument, StockDocumentInput, Summary, WarrantyCase, WarrantyStatus } from './types'
 
 // Mọi lời gọi backend đi qua đây để thống nhất xử lý lỗi và thông báo cho người dùng.
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -41,12 +41,16 @@ export const api = {
     request<SaleReturnItem>(`/returns/items/${id}/warranty`, { method: 'PATCH', body: JSON.stringify({ outcome }) }),
   history: (filters?: { action?: string; query?: string }) => request<ProductAudit[]>(`/history${filters ? `?${new URLSearchParams(Object.entries(filters).filter(([, value]) => Boolean(value)) as [string, string][]).toString()}` : ''}`),
   movements: (filters?: { direction?: string; query?: string }) => request<StockMovement[]>(`/movements${filters ? `?${new URLSearchParams(Object.entries(filters).filter(([, value]) => Boolean(value)) as [string, string][]).toString()}` : ''}`),
+  stockDocuments: () => request<StockDocument[]>('/stock-documents'),
+  createStockDocument: (data: StockDocumentInput) => request<StockDocument>('/stock-documents', { method: 'POST', body: JSON.stringify(data) }),
   warranties: () => request<WarrantyCase[]>('/warranties'),
-  createCustomerWarranty: (data: { productId: number; quantity: number; customerName: string; customerPhone: string; saleNumber: string; issue: string }) =>
+  createCustomerWarranty: (data: { productId: number; quantity: number; customerName: string; customerPhone: string; saleNumber: string; issue: string; units: { serialNumber: string; warrantyExpiresOn: string }[]; expectedReturnOn: string; partner: string }) =>
     request<WarrantyCase>('/warranties/customer', { method: 'POST', body: JSON.stringify(data) }),
-  createInternalWarranty: (data: { productId: number; quantity: number; issue: string }) =>
+  createInternalWarranty: (data: { productId: number; quantity: number; issue: string; units: { serialNumber: string; warrantyExpiresOn: string }[]; expectedReturnOn: string; partner: string }) =>
     request<WarrantyCase>('/warranties/internal', { method: 'POST', body: JSON.stringify(data) }),
   updateWarranty: (id: number, data: { status: WarrantyStatus; note: string; partner: string }) =>
     request<WarrantyCase>(`/warranties/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
+  updateWarrantyDetails: (id: number, data: { units: { serialNumber: string; warrantyExpiresOn: string }[]; expectedReturnOn: string; partner: string }) =>
+    request<WarrantyCase>('/warranties/' + id + '/details', { method: 'PUT', body: JSON.stringify(data) }),
   summary: () => request<Summary>('/summary'),
 }

@@ -76,6 +76,8 @@ app.MapPost("/api/products", async (InventoryDb db, ProductInput input) =>
     if (await db.Products.AnyAsync(p => p.Code == code))
         return Results.Conflict(new { message = "Mã sản phẩm đã tồn tại." });
 
+    if (input.Quantity != 0)
+        return Results.BadRequest(new { message = "Tạo sản phẩm với tồn kho 0, sau đó lập phiếu nhập kho." });
     var now = DateTime.UtcNow;
     var product = new Product { CreatedAt = now, UpdatedAt = now };
     Apply(product, input);
@@ -100,13 +102,12 @@ app.MapPut("/api/products/{id:int}", async (InventoryDb db, int id, ProductInput
     if (await db.Products.AnyAsync(p => p.Code == code && p.Id != id))
         return Results.Conflict(new { message = "Mã sản phẩm đã tồn tại." });
 
+    if (input.Quantity != product.Quantity)
+        return Results.BadRequest(new { message = "Hãy dùng phiếu nhập kho hoặc kiểm kê để thay đổi số lượng." });
     var before = Snapshot(product);
-    var quantityChange = input.Quantity - product.Quantity;
     Apply(product, input);
     product.UpdatedAt = DateTime.UtcNow;
     db.ProductAudits.Add(Audit(product, "updated", "Đã chỉnh sửa sản phẩm", before, Snapshot(product)));
-    if (quantityChange != 0)
-        db.StockMovements.Add(Movement(product, quantityChange, "Điều chỉnh thủ công", ""));
     await db.SaveChangesAsync();
     return Results.Ok(product);
 });
@@ -234,6 +235,7 @@ app.MapGet("/api/sales", async (InventoryDb db, string? from, string? to) =>
 
 app.MapSaleManagementEndpoints();
 app.MapWarrantyEndpoints();
+app.MapStockDocumentEndpoints();
 
 // Thống kê ngày: bỏ hóa đơn đã xóa và trừ số tiền hoàn hàng.
 app.MapGet("/api/summary", async (InventoryDb db) =>

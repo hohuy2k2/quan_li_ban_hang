@@ -43,7 +43,7 @@ export function ProductFormModal({ editing, initialValue, onClose, onSave, onErr
             <label>Giá nhập (₫)<input type="number" min="0" step="1" required value={form.purchasePrice} onChange={event => setForm({ ...form, purchasePrice: Number(event.target.value) })} /></label>
             <label>Thuế giá nhập<div className="select-wrap full"><select value={form.purchasePriceIncludesTax ? 'yes' : 'no'} onChange={event => setForm({ ...form, purchasePriceIncludesTax: event.target.value === 'yes' })}><option value="no">Chưa thuế</option><option value="yes">Có thuế</option></select><ChevronDown size={16} /></div></label>
             <label>Giá bán (₫) <em>*</em><input type="number" min="0" step="1" required value={form.salePrice} onChange={event => setForm({ ...form, salePrice: Number(event.target.value) })} /></label>
-            <label>Số lượng hiện có <em>*</em><input type="number" min="0" step="1" required value={form.quantity} onChange={event => setForm({ ...form, quantity: Number(event.target.value) })} /></label>
+            <div className="stock-form-hint">Số lượng được cập nhật bằng phiếu nhập kho hoặc kiểm kê. Sản phẩm mới bắt đầu với tồn kho 0.</div>
             <label>Mức cảnh báo tồn thấp<input type="number" min="0" step="1" required value={form.lowStockThreshold} onChange={event => setForm({ ...form, lowStockThreshold: Number(event.target.value) })} /></label>
           </div>
           <div className="modal-footer">

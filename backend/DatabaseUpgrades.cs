@@ -81,6 +81,38 @@ public static class DatabaseUpgrades
                 ON "WarrantyEvents" ("WarrantyCaseId");
             """);
 
+        // DB cũ cần thêm bảng; DB mới đã có sau EnsureCreated.
+        db.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "StockDocuments" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_StockDocuments" PRIMARY KEY AUTOINCREMENT,
+                "Number" TEXT NOT NULL, "Kind" TEXT NOT NULL, "DocumentDate" TEXT NOT NULL,
+                "Supplier" TEXT NOT NULL, "Reason" TEXT NOT NULL, "CreatedAt" TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS "StockDocumentLines" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_StockDocumentLines" PRIMARY KEY AUTOINCREMENT,
+                "StockDocumentId" INTEGER NOT NULL, "ProductId" INTEGER NOT NULL,
+                "ProductCode" TEXT NOT NULL, "ProductName" TEXT NOT NULL,
+                "QuantityBefore" INTEGER NOT NULL, "QuantityChange" INTEGER NOT NULL,
+                "QuantityAfter" INTEGER NOT NULL, "PurchasePrice" INTEGER NULL,
+                "PurchasePriceIncludesTax" INTEGER NULL,
+                CONSTRAINT "FK_StockDocumentLines_StockDocuments_StockDocumentId"
+                    FOREIGN KEY ("StockDocumentId") REFERENCES "StockDocuments" ("Id") ON DELETE CASCADE
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_StockDocuments_Number" ON "StockDocuments" ("Number");
+            CREATE INDEX IF NOT EXISTS "IX_StockDocumentLines_StockDocumentId" ON "StockDocumentLines" ("StockDocumentId");
+            """);
+        db.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "WarrantyUnits" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_WarrantyUnits" PRIMARY KEY AUTOINCREMENT,
+                "WarrantyCaseId" INTEGER NOT NULL, "SerialNumber" TEXT NOT NULL,
+                "WarrantyExpiresOn" TEXT NOT NULL,
+                CONSTRAINT "FK_WarrantyUnits_WarrantyCases_WarrantyCaseId"
+                    FOREIGN KEY ("WarrantyCaseId") REFERENCES "WarrantyCases" ("Id") ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS "IX_WarrantyUnits_WarrantyCaseId" ON "WarrantyUnits" ("WarrantyCaseId");
+            """);
+        AddWarrantyColumn(db, "ExpectedReturnOn");
+
         // Existing warranty returns become visible in the new warranty page.
         db.Database.ExecuteSqlRaw("""
             INSERT INTO "WarrantyCases"
@@ -104,5 +136,31 @@ public static class DatabaseUpgrades
                 SELECT 1 FROM "WarrantyCases" w WHERE w."SaleReturnItemId" = i."Id"
               );
             """);
+    }
+
+    private static void AddWarrantyColumn(InventoryDb db, string name)
+    {
+        var connection = db.Database.GetDbConnection();
+        var openedHere = connection.State != System.Data.ConnectionState.Open;
+        if (openedHere) connection.Open();
+        try
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = "PRAGMA table_info('WarrantyCases');";
+            using var reader = command.ExecuteReader();
+            var exists = false;
+            while (reader.Read())
+                if (reader.GetString(1) == name) exists = true;
+            reader.Close();
+            if (!exists)
+            {
+                if (name != "ExpectedReturnOn") throw new ArgumentOutOfRangeException(nameof(name));
+                db.Database.ExecuteSqlRaw("ALTER TABLE \"WarrantyCases\" ADD COLUMN \"ExpectedReturnOn\" TEXT NOT NULL DEFAULT '';");
+            }
+        }
+        finally
+        {
+            if (openedHere) connection.Close();
+        }
     }
 }

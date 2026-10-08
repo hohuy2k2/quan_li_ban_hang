@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 
 namespace InventoryApp;
@@ -7,12 +8,13 @@ public static class WarrantyEndpoints
     public static void MapWarrantyEndpoints(this WebApplication app)
     {
         app.MapGet("/api/warranties", async (InventoryDb db) =>
-            Results.Ok(await db.WarrantyCases.AsNoTracking().Include(w => w.Events)
+            Results.Ok(await db.WarrantyCases.AsNoTracking().Include(w => w.Events).Include(w => w.Units)
                 .AsSplitQuery().OrderByDescending(w => w.CreatedAt).ToListAsync()));
 
         app.MapPost("/api/warranties/internal", CreateInternal);
         app.MapPost("/api/warranties/customer", CreateCustomer);
         app.MapPatch("/api/warranties/{id:int}", UpdateStatus);
+        app.MapPut("/api/warranties/{id:int}/details", UpdateDetails);
     }
 
     // Hàng khách gửi trực tiếp không ảnh hưởng tới tồn kho bán được.
@@ -20,7 +22,8 @@ public static class WarrantyEndpoints
     {
         if (input.Quantity <= 0 || string.IsNullOrWhiteSpace(input.Issue) || input.Issue.Length > 500 ||
             (string.IsNullOrWhiteSpace(input.CustomerName) && string.IsNullOrWhiteSpace(input.CustomerPhone)) ||
-            input.CustomerName?.Length > 120 || input.CustomerPhone?.Length > 30 || input.SaleNumber?.Length > 60)
+            input.CustomerName?.Length > 120 || input.CustomerPhone?.Length > 30 || input.SaleNumber?.Length > 60 ||
+            !ValidDetails(input.Units, input.Quantity, input.ExpectedReturnOn, input.Partner))
             return Results.BadRequest(new { message = "Thông tin bảo hành của khách không hợp lệ." });
 
         var product = await db.Products.AsNoTracking()
@@ -41,6 +44,9 @@ public static class WarrantyEndpoints
             CustomerName = input.CustomerName?.Trim() ?? "",
             CustomerPhone = input.CustomerPhone?.Trim() ?? "",
             Issue = input.Issue.Trim(),
+            Partner = input.Partner?.Trim() ?? "",
+            Units = BuildUnits(input.Units),
+            ExpectedReturnOn = input.ExpectedReturnOn?.Trim() ?? "",
             Status = "received",
             CreatedAt = now,
             UpdatedAt = now,
@@ -54,7 +60,8 @@ public static class WarrantyEndpoints
     // Hàng lỗi nội bộ được tách khỏi tồn kho cho đến khi sửa xong và nhập lại.
     private static async Task<IResult> CreateInternal(InventoryDb db, InternalWarrantyInput input)
     {
-        if (input.Quantity <= 0 || string.IsNullOrWhiteSpace(input.Issue) || input.Issue.Length > 500)
+        if (input.Quantity <= 0 || string.IsNullOrWhiteSpace(input.Issue) || input.Issue.Length > 500 ||
+            !ValidDetails(input.Units, input.Quantity, input.ExpectedReturnOn, input.Partner))
             return Results.BadRequest(new { message = "Chọn số lượng và mô tả lỗi (tối đa 500 ký tự)." });
 
         await using var transaction = await db.Database.BeginTransactionAsync();
@@ -80,6 +87,9 @@ public static class WarrantyEndpoints
             ProductName = product.Name,
             Quantity = input.Quantity,
             Issue = input.Issue.Trim(),
+            Partner = input.Partner?.Trim() ?? "",
+            Units = BuildUnits(input.Units),
+            ExpectedReturnOn = input.ExpectedReturnOn?.Trim() ?? "",
             Status = "received",
             CreatedAt = now,
             UpdatedAt = now,
@@ -160,6 +170,66 @@ public static class WarrantyEndpoints
         await transaction.CommitAsync();
         return Results.Ok(warranty);
     }
+
+    // Có thể bổ sung serial/ngày hẹn cho phiếu cũ mà không đổi trạng thái hay số lượng.
+    private static async Task<IResult> UpdateDetails(InventoryDb db, int id, WarrantyDetailsInput input)
+    {
+        var warranty = await db.WarrantyCases.Include(w => w.Events).Include(w => w.Units).AsSplitQuery()
+            .FirstOrDefaultAsync(w => w.Id == id);
+        if (warranty is null)
+            return Results.NotFound(new { message = "Không tìm thấy phiếu bảo hành." });
+        if (!ValidDetails(input.Units, warranty.Quantity, input.ExpectedReturnOn, input.Partner))
+            return Results.BadRequest(new { message = "Serial, hạn bảo hành, ngày hẹn hoặc nơi bảo hành không hợp lệ." });
+
+        var units = BuildUnits(input.Units);
+        var expected = input.ExpectedReturnOn?.Trim() ?? "";
+        var partner = input.Partner?.Trim() ?? "";
+        var oldUnits = warranty.Units.OrderBy(u => u.Id).Select(u => (u.SerialNumber, u.WarrantyExpiresOn));
+        var newUnits = units.Select(u => (u.SerialNumber, u.WarrantyExpiresOn));
+        if (oldUnits.SequenceEqual(newUnits) && warranty.ExpectedReturnOn == expected &&
+            warranty.Partner == partner)
+            return Results.Ok(warranty);
+
+        db.WarrantyUnits.RemoveRange(warranty.Units);
+        warranty.Units.Clear();
+        warranty.Units.AddRange(units);
+        warranty.ExpectedReturnOn = expected;
+        warranty.Partner = partner;
+        warranty.UpdatedAt = DateTime.UtcNow;
+        warranty.Events.Add(new WarrantyEvent
+        {
+            Status = warranty.Status, Note = "Đã cập nhật serial, hạn bảo hành, ngày hẹn hoặc nơi bảo hành.",
+            At = warranty.UpdatedAt
+        });
+        await db.SaveChangesAsync();
+        return Results.Ok(warranty);
+    }
+
+    private static List<WarrantyUnit> BuildUnits(List<WarrantyUnitInput>? units) =>
+        (units ?? []).Select(u => new WarrantyUnit
+        {
+            SerialNumber = u.SerialNumber?.Trim() ?? "",
+            WarrantyExpiresOn = u.WarrantyExpiresOn?.Trim() ?? ""
+        }).ToList();
+
+    private static bool ValidDetails(List<WarrantyUnitInput>? units, int quantity, string? expected, string? partner)
+    {
+        if (units?.Count > quantity || (partner?.Length ?? 0) > 120 || !ValidDate(expected))
+            return false;
+        var serials = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var unit in units ?? [])
+        {
+            var serial = unit.SerialNumber?.Trim();
+            if (string.IsNullOrEmpty(serial) || serial.Length > 100 ||
+                !ValidDate(unit.WarrantyExpiresOn) || !serials.Add(serial))
+                return false;
+        }
+        return true;
+    }
+
+    private static bool ValidDate(string? value) =>
+        string.IsNullOrWhiteSpace(value) ||
+        DateOnly.TryParseExact(value.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _);
 
     public static string NewNumber() =>
         $"BH-{DateTime.Now:yyMMdd}-{Guid.NewGuid().ToString("N")[..6].ToUpperInvariant()}";
