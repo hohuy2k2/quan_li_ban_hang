@@ -7,7 +7,7 @@ import { api } from '../api'
 import type { Product, Summary } from '../types'
 import { dateTime, money, searchKey } from '../utils/format'
 
-type CartLine = { product: Product; quantity: number }
+type CartLine = { product: Product; quantity: number; discountPerUnit: number }
 type Props = {
   active: boolean
   products: Product[]
@@ -19,6 +19,7 @@ type Props = {
   showToast: (message: string, kind?: 'success' | 'error') => void
 }
 
+/** Quét mã, lập giỏ hàng, tính giảm giá từng món và lưu đơn bán. */
 export function SalesPage({ active, products, summary, now, onRefresh, onShowInvoices, onShowLowStock, showToast }: Props) {
   const [cart, setCart] = useState<CartLine[]>([])
   const [scanCode, setScanCode] = useState('')
@@ -40,7 +41,9 @@ export function SalesPage({ active, products, summary, now, onRefresh, onShowInv
     const term = searchKey(manualSearch)
     return products.filter(p => searchKey(`${p.code} ${p.name} ${p.brand} ${p.category}`).includes(term)).slice(0, 8)
   }, [products, manualSearch])
-  const cartTotal = cart.reduce((sum, line) => sum + line.product.salePrice * line.quantity, 0)
+  const cartSubtotal = cart.reduce((sum, line) => sum + line.product.salePrice * line.quantity, 0)
+  const cartDiscount = cart.reduce((sum, line) => sum + line.discountPerUnit * line.quantity, 0)
+  const cartTotal = cartSubtotal - cartDiscount
   const cartCount = cart.reduce((sum, line) => sum + line.quantity, 0)
 
   function addToCart(product: Product) {
@@ -57,7 +60,7 @@ export function SalesPage({ active, products, summary, now, onRefresh, onShowInv
       const found = current.find(line => line.product.id === product.id)
       return found
         ? current.map(line => line.product.id === product.id ? { ...line, quantity: line.quantity + 1 } : line)
-        : [...current, { product, quantity: 1 }]
+        : [...current, { product, quantity: 1, discountPerUnit: 0 }]
     })
     setManualSearch('')
     scanRef.current?.focus()
@@ -109,13 +112,19 @@ export function SalesPage({ active, products, summary, now, onRefresh, onShowInv
     scanRef.current?.focus()
   }
 
+  function changeDiscount(id: number, value: number) {
+    setCart(current => current.map(line => line.product.id === id
+      ? { ...line, discountPerUnit: Math.max(0, Math.min(line.product.salePrice, Math.floor(value) || 0)) }
+      : line))
+  }
+
   async function checkout() {
     if (!cart.length) return
     setCheckingOut(true)
     try {
       const sale = await api.createSale({
         customerName, customerPhone,
-        items: cart.map(line => ({ productId: line.product.id, quantity: line.quantity })),
+        items: cart.map(line => ({ productId: line.product.id, quantity: line.quantity, discountPerUnit: line.discountPerUnit })),
       })
       setCart([])
       setCustomerName('')
@@ -151,14 +160,14 @@ export function SalesPage({ active, products, summary, now, onRefresh, onShowInv
 
           <div className="panel cart-panel">
             <div className="panel-heading"><div><span className="section-icon"><ShoppingCart size={19} /></span><h2>Sản phẩm trong đơn</h2><span className="count-badge">{cartCount}</span></div>{cart.length > 0 && <button className="text-danger" onClick={() => setCart([])}>Xoá đơn</button>}</div>
-            {cart.length === 0 ? <div className="empty-cart"><div className="empty-graphic"><ShoppingCart size={33} /></div><strong>Đơn hàng đang trống</strong><span>Quét mã hoặc tìm sản phẩm để bắt đầu bán hàng</span></div> : <div className="cart-list">{cart.map(line => <div className="cart-line" key={line.product.id}><div className="cart-product-icon"><Package size={21} /></div><div className="cart-product"><strong>{line.product.name}</strong><span>{line.product.code} · {money(line.product.salePrice)} / sản phẩm</span></div><div className="quantity-control"><button onClick={() => changeQuantity(line.product.id, line.quantity - 1)} aria-label="Giảm số lượng"><Minus size={14} /></button><span>{line.quantity}</span><button onClick={() => changeQuantity(line.product.id, line.quantity + 1)} aria-label="Tăng số lượng"><Plus size={14} /></button></div><strong className="line-total">{money(line.product.salePrice * line.quantity)}</strong><button className="remove-line" onClick={() => changeQuantity(line.product.id, 0)} aria-label="Xoá sản phẩm"><X size={17} /></button></div>)}</div>}
+            {cart.length === 0 ? <div className="empty-cart"><div className="empty-graphic"><ShoppingCart size={33} /></div><strong>Đơn hàng đang trống</strong><span>Quét mã hoặc tìm sản phẩm để bắt đầu bán hàng</span></div> : <div className="cart-list">{cart.map(line => <div className="cart-line" key={line.product.id}><div className="cart-product-icon"><Package size={21} /></div><div className="cart-product"><strong>{line.product.name}</strong><span>{line.product.code} · {money(line.product.salePrice)} / sản phẩm</span></div><div className="quantity-control"><button onClick={() => changeQuantity(line.product.id, line.quantity - 1)} aria-label="Giảm số lượng"><Minus size={14} /></button><span>{line.quantity}</span><button onClick={() => changeQuantity(line.product.id, line.quantity + 1)} aria-label="Tăng số lượng"><Plus size={14} /></button></div><label className="cart-discount">Giảm/món (đ)<input type="number" min="0" max={line.product.salePrice} step="1" inputMode="numeric" value={line.discountPerUnit} onChange={event => changeDiscount(line.product.id, Number(event.target.value))} aria-label={`Giảm giá mỗi món ${line.product.name}`} /></label><strong className="line-total">{money((line.product.salePrice - line.discountPerUnit) * line.quantity)}</strong><button className="remove-line" onClick={() => changeQuantity(line.product.id, 0)} aria-label="Xoá sản phẩm"><X size={17} /></button></div>)}</div>}
           </div>
         </div>
 
         <aside className="order-panel panel">
           <div className="order-panel-top"><span className="section-icon dark"><ReceiptText size={20} /></span><div><h2>Thông tin đơn hàng</h2><p>Chi tiết thanh toán</p></div></div>
           <div className="order-fields"><label>Họ tên khách hàng <span>(không bắt buộc)</span><input value={customerName} onChange={event => setCustomerName(event.target.value)} placeholder="Nhập tên khách hàng" maxLength={120} /></label><label>Số điện thoại <span>(không bắt buộc)</span><input value={customerPhone} onChange={event => setCustomerPhone(event.target.value)} placeholder="Nhập số điện thoại" maxLength={30} inputMode="tel" /></label><label>Thời gian mua<input value={dateTime(now)} readOnly className="readonly-input" /></label></div>
-          <div className="order-summary"><div><span>Số lượng sản phẩm</span><strong>{cartCount}</strong></div><div><span>Tạm tính</span><strong>{money(cartTotal)}</strong></div><div className="total-row"><span>Tổng thanh toán</span><strong>{money(cartTotal)}</strong></div></div>
+          <div className="order-summary"><div><span>Số lượng sản phẩm</span><strong>{cartCount}</strong></div><div><span>Tạm tính</span><strong>{money(cartSubtotal)}</strong></div><div><span>Giảm giá</span><strong>−{money(cartDiscount)}</strong></div><div className="total-row"><span>Tổng thanh toán</span><strong>{money(cartTotal)}</strong></div></div>
           <button className="checkout-button" onClick={() => void checkout()} disabled={!cart.length || checkingOut}><span>{checkingOut ? 'Đang lưu đơn...' : 'Thanh toán & lưu hoá đơn'}</span><ArrowRight size={19} /></button>
           <div className="order-footnote"><Check size={15} />Tồn kho được trừ sau khi thanh toán thành công.</div>
           {lastInvoice && <button className="last-invoice" onClick={onShowInvoices}><ReceiptText size={17} />Đơn vừa lưu: <strong>{lastInvoice}</strong><ArrowRight size={15} /></button>}

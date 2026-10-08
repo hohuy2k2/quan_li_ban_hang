@@ -21,6 +21,7 @@ export interface SaleItem {
   productCode: string
   productName: string
   unitPrice: number
+  discountPerUnit: number
   quantity: number
   lineTotal: number
 }
@@ -32,6 +33,8 @@ export interface Sale {
   customerPhone: string
   soldAt: string
   total: number
+  isDeleted: boolean
+  deletedAt: string | null
   items: SaleItem[]
   returns: SaleReturn[]
 }
@@ -66,7 +69,7 @@ export interface SaleReturn {
 export interface SaleInput {
   customerName: string
   customerPhone: string
-  items: { productId: number; quantity: number }[]
+  items: { productId: number; quantity: number; discountPerUnit: number }[]
 }
 
 export interface ReturnInput {
@@ -101,4 +104,35 @@ export interface Summary {
   lowStockCount: number
   salesToday: number
   revenueToday: number
+}
+
+export type WarrantyStatus = 'received' | 'sent' | 'ready' | 'returned_to_customer' | 'restocked' | 'discarded'
+
+export interface WarrantyEvent {
+  id: number
+  warrantyCaseId: number
+  status: WarrantyStatus
+  note: string
+  at: string
+}
+
+export interface WarrantyCase {
+  id: number
+  number: string
+  source: 'customer' | 'internal'
+  saleNumber: string
+  saleReturnItemId: number | null
+  productId: number
+  productCode: string
+  productName: string
+  quantity: number
+  customerName: string
+  customerPhone: string
+  issue: string
+  partner: string
+  status: WarrantyStatus
+  createdAt: string
+  updatedAt: string
+  completedAt: string | null
+  events: WarrantyEvent[]
 }

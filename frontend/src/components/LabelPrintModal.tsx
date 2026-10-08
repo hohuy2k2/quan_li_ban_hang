@@ -7,6 +7,7 @@ import { money } from '../utils/format'
 
 type Props = { product: Product; onClose: () => void }
 
+/** Xem trước và in tem nhiệt với tên, giá và mã vạch sản phẩm. */
 export function LabelPrintModal({ product, onClose }: Props) {
   const [quantity, setQuantity] = useState(1)
 

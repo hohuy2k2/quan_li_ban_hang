@@ -17,23 +17,59 @@ public static class SaleManagementEndpoints
         });
 
         app.MapPut("/api/sales/{id:int}", UpdateSale);
+        app.MapDelete("/api/sales/{id:int}", DeleteSale);
         app.MapPost("/api/sales/{id:int}/returns", ReturnItems);
         app.MapPatch("/api/returns/items/{id:int}/warranty", ResolveWarranty);
     }
 
+    // Hide an unused invoice but retain its record for stock-history lookup.
+    // Returns or warranties must be handled through their own records, so those invoices cannot be deleted.
+    private static async Task<IResult> DeleteSale(InventoryDb db, int id)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync();
+        var sale = await db.Sales.Include(s => s.Items).Include(s => s.Returns)
+            .FirstOrDefaultAsync(s => s.Id == id);
+        if (sale is null || sale.IsDeleted)
+            return Results.NotFound(new { message = "Không tìm thấy hoá đơn cần xoá." });
+        if (sale.Returns.Count > 0 ||
+            await db.WarrantyCases.AnyAsync(w => w.Source == "customer" && w.SaleNumber == sale.Number))
+            return Results.Conflict(new { message = "Hoá đơn đã có hàng trả hoặc bảo hành, không thể xoá. Hãy giữ lại để đối chiếu." });
+
+        var now = DateTime.UtcNow;
+        foreach (var line in sale.Items.GroupBy(i => i.ProductId))
+        {
+            var product = await db.Products.AsNoTracking().FirstOrDefaultAsync(p => p.Id == line.Key);
+            if (product is null)
+                return Results.Conflict(new { message = "Sản phẩm trong hoá đơn không còn tồn tại." });
+            var quantity = line.Sum(i => i.Quantity);
+            await db.Products.Where(p => p.Id == product.Id)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(p => p.Quantity, p => p.Quantity + quantity)
+                    .SetProperty(p => p.UpdatedAt, now));
+            db.StockMovements.Add(NewMovement(product, quantity, "Xoá hoá đơn", sale.Number));
+        }
+
+        sale.IsDeleted = true;
+        sale.DeletedAt = now;
+        await db.SaveChangesAsync();
+        await transaction.CommitAsync();
+        return Results.NoContent();
+    }
+
+    // Sửa hóa đơn: điều chỉnh chênh lệch tồn kho; khóa sửa nếu đã có hàng trả.
     private static async Task<IResult> UpdateSale(InventoryDb db, int id, SaleInput input)
     {
-        if (input.Items is null || input.Items.Count == 0 || input.Items.Any(i => i.Quantity <= 0))
+        if (input.Items is null || input.Items.Count == 0 || input.Items.Any(i => i.Quantity <= 0 || i.DiscountPerUnit < 0) || input.Items.Select(i => i.ProductId).Distinct().Count() != input.Items.Count)
             return Results.BadRequest(new { message = "Hoá đơn cần có sản phẩm với số lượng lớn hơn 0." });
         if (input.CustomerName?.Length > 120 || input.CustomerPhone?.Length > 30)
             return Results.BadRequest(new { message = "Thông tin khách hàng quá dài." });
 
-        var lines = input.Items.GroupBy(i => i.ProductId)
-            .Select(g => new SaleLineInput(g.Key, g.Sum(i => i.Quantity))).ToList();
+        var lines = input.Items;
         await using var transaction = await db.Database.BeginTransactionAsync();
         var sale = await db.Sales.Include(s => s.Items).Include(s => s.Returns)
             .FirstOrDefaultAsync(s => s.Id == id);
         if (sale is null) return Results.NotFound(new { message = "Không tìm thấy hoá đơn." });
+        if (sale.IsDeleted) return Results.Conflict(new { message = "Hoá đơn đã xoá, không thể thay đổi." });
         if (sale.Returns.Count > 0)
             return Results.Conflict(new { message = "Hoá đơn đã có hàng trả. Không thể sửa sản phẩm hoặc thông tin khách của hoá đơn này." });
 
@@ -74,13 +110,16 @@ public static class SaleManagementEndpoints
             var product = products[line.ProductId];
             var original = oldItems.GetValueOrDefault(line.ProductId);
             var unitPrice = original?.UnitPrice ?? product.SalePrice;
-            var lineTotal = checked(unitPrice * line.Quantity);
+            if (line.DiscountPerUnit > unitPrice)
+                return Results.BadRequest(new { message = $"Giảm giá của {product.Name} vượt giá bán." });
+            var lineTotal = checked((unitPrice - line.DiscountPerUnit) * line.Quantity);
             sale.Items.Add(new SaleItem
             {
                 ProductId = line.ProductId,
                 ProductCode = original?.ProductCode ?? product.Code,
                 ProductName = original?.ProductName ?? product.Name,
                 UnitPrice = unitPrice,
+                DiscountPerUnit = line.DiscountPerUnit,
                 Quantity = line.Quantity,
                 LineTotal = lineTotal
             });
@@ -93,6 +132,7 @@ public static class SaleManagementEndpoints
         return Results.Ok(sale);
     }
 
+    // Trả hàng: chỉ món nhập lại kho được hoàn tiền theo giá sau giảm.
     private static async Task<IResult> ReturnItems(InventoryDb db, int id, SaleReturnInput input)
     {
         if (input.Items is null || input.Items.Count == 0 || input.Items.Any(i => i.Quantity <= 0))
@@ -109,6 +149,7 @@ public static class SaleManagementEndpoints
             .Include(s => s.Returns).ThenInclude(r => r.Items).AsSplitQuery()
             .FirstOrDefaultAsync(s => s.Id == id);
         if (sale is null) return Results.NotFound(new { message = "Không tìm thấy hoá đơn." });
+        if (sale.IsDeleted) return Results.Conflict(new { message = "Hoá đơn đã xoá, không thể thay đổi." });
 
         var saleItems = sale.Items.ToDictionary(i => i.Id);
         var alreadyReturned = sale.Returns.SelectMany(r => r.Items)
@@ -131,7 +172,7 @@ public static class SaleManagementEndpoints
         foreach (var line in input.Items)
         {
             var original = saleItems[line.SaleItemId];
-            var refundAmount = line.Refund ? checked(original.UnitPrice * line.Quantity) : 0;
+            var refundAmount = line.Refund ? checked((original.UnitPrice - original.DiscountPerUnit) * line.Quantity) : 0;
             saleReturn.Items.Add(new SaleReturnItem
             {
                 SaleItemId = original.Id,
@@ -158,10 +199,36 @@ public static class SaleManagementEndpoints
         }
         db.SaleReturns.Add(saleReturn);
         await db.SaveChangesAsync();
+        foreach (var item in saleReturn.Items.Where(i => i.Disposition == "warranty"))
+        {
+            db.WarrantyCases.Add(new WarrantyCase
+            {
+                Number = WarrantyEndpoints.NewNumber(),
+                Source = "customer",
+                SaleNumber = sale.Number,
+                SaleReturnItemId = item.Id,
+                ProductId = item.ProductId,
+                ProductCode = item.ProductCode,
+                ProductName = item.ProductName,
+                Quantity = item.Quantity,
+                CustomerName = sale.CustomerName,
+                CustomerPhone = sale.CustomerPhone,
+                Issue = saleReturn.Reason,
+                Status = "received",
+                CreatedAt = saleReturn.ReturnedAt,
+                UpdatedAt = saleReturn.ReturnedAt,
+                Events = [new WarrantyEvent
+                {
+                    Status = "received", Note = saleReturn.Reason, At = saleReturn.ReturnedAt
+                }]
+            });
+        }
+        await db.SaveChangesAsync();
         await transaction.CommitAsync();
         return Results.Created($"/api/sales/by-number/{Uri.EscapeDataString(sale.Number)}", saleReturn);
     }
 
+    // Giữ trạng thái bảo hành trong hóa đơn đồng bộ với trang Bảo hành.
     private static async Task<IResult> ResolveWarranty(InventoryDb db, int id, WarrantyResolutionInput input)
     {
         if (input.Outcome is not ("returned_to_customer" or "discard"))
@@ -172,8 +239,21 @@ public static class SaleManagementEndpoints
         if (item.Disposition != "warranty" || item.WarrantyResolution != "")
             return Results.Conflict(new { message = "Món hàng này không còn chờ xử lý bảo hành." });
 
+        var now = DateTime.UtcNow;
         item.WarrantyResolution = input.Outcome;
-        item.WarrantyResolvedAt = DateTime.UtcNow;
+        item.WarrantyResolvedAt = now;
+        var warranty = await db.WarrantyCases.FirstOrDefaultAsync(w => w.SaleReturnItemId == id);
+        if (warranty is not null)
+        {
+            warranty.Status = input.Outcome == "discard" ? "discarded" : input.Outcome;
+            warranty.UpdatedAt = now;
+            warranty.CompletedAt = now;
+            db.WarrantyEvents.Add(new WarrantyEvent
+            {
+                WarrantyCaseId = warranty.Id, Status = warranty.Status,
+                Note = "Cập nhật từ hoá đơn", At = now
+            });
+        }
         await db.SaveChangesAsync();
         await transaction.CommitAsync();
         return Results.Ok(item);

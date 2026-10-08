@@ -10,6 +10,7 @@ type Props = {
   onError: (message: string) => void
 }
 
+/**Biểu mẫu thêm/sửa sản phẩm, gồm giá nhập, thuế, giá bán và tồn kho. */
 export function ProductFormModal({ editing, initialValue, onClose, onSave, onError }: Props) {
   const [form, setForm] = useState<ProductInput>(initialValue)
   const [saving, setSaving] = useState(false)

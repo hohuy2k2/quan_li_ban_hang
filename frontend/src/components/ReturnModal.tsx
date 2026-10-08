@@ -24,6 +24,7 @@ function remaining(sale: Sale, item: SaleItem) {
   return item.quantity - returned
 }
 
+/** Chia số hàng trả thành nhập kho hoàn tiền, bảo hành hoặc bỏ đi. */
 export function ReturnModal({ sale, onClose, onSave, onError }: Props) {
   const [reason, setReason] = useState('')
   const [counts, setCounts] = useState<Counts>({})
@@ -34,7 +35,7 @@ export function ReturnModal({ sale, onClose, onSave, onError }: Props) {
     return quantity > 0 ? [{ saleItemId: item.id, quantity, disposition: key, refund: key === 'restock' }] : []
   }))
   const refund = selected.reduce((sum, line) =>
-    sum + (line.refund ? (sale.items.find(item => item.id === line.saleItemId)?.unitPrice ?? 0) * line.quantity : 0), 0)
+    sum + (line.refund ? ((sale.items.find(item => item.id === line.saleItemId)?.unitPrice ?? 0) - (sale.items.find(item => item.id === line.saleItemId)?.discountPerUnit ?? 0)) * line.quantity : 0), 0)
 
   function changeCount(itemId: number, disposition: ReturnDisposition, value: number) {
     setCounts(current => ({
@@ -66,7 +67,7 @@ export function ReturnModal({ sale, onClose, onSave, onError }: Props) {
             {sale.items.map(item => {
               const available = remaining(sale, item)
               return <div className="return-line" key={item.id}>
-                <div className="return-line-heading"><strong>{item.productName}</strong><span>{item.productCode} · Còn được trả {available}/{item.quantity} · {money(item.unitPrice)}/món</span></div>
+                <div className="return-line-heading"><strong>{item.productName}</strong><span>{item.productCode} · Còn được trả {available}/{item.quantity} · {money(item.unitPrice - (item.discountPerUnit ?? 0))}/món đã thanh toán</span></div>
                 <div className="return-dispositions">{dispositions.map(({ key, label, note }) => <label key={key}>{label}<small>{note}</small><input type="number" min="0" max={available} disabled={available === 0} value={counts[item.id]?.[key] ?? 0} onChange={event => changeCount(item.id, key, Number(event.target.value))} /></label>)}</div>
               </div>
             })}

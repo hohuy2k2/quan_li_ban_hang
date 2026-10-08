@@ -3,6 +3,8 @@ import { ArrowRight, ReceiptText, Search } from 'lucide-react'
 import { api } from '../api'
 import { InvoiceDetailModal } from '../components/InvoiceDetailModal'
 import { InvoiceEditModal } from '../components/InvoiceEditModal'
+import { Pagination } from '../components/Pagination'
+import { usePagination } from '../hooks/usePagination'
 import { ReturnModal } from '../components/ReturnModal'
 import type { Product, ReturnInput, Sale, SaleInput } from '../types'
 import { dateTime, money, searchKey } from '../utils/format'
@@ -15,6 +17,7 @@ type Props = {
   showToast: (message: string, kind?: 'success' | 'error') => void
 }
 
+/** Tra cứu hoá đơn; sửa và xoá đều đi qua API để điều chỉnh tồn kho. */
 export function InvoicesPage({ active, sales, products, onRefresh, showToast }: Props) {
   const [invoiceSearch, setInvoiceSearch] = useState('')
   const [fromDate, setFromDate] = useState('')
@@ -43,12 +46,26 @@ export function InvoicesPage({ active, sales, products, onRefresh, showToast }: 
     return (fromDate || toDate ? datedSales ?? [] : sales)
       .filter(sale => searchKey(`${sale.number} ${sale.customerName} ${sale.customerPhone}`).includes(term))
   }, [sales, datedSales, fromDate, toDate, invoiceSearch])
+  const pager = usePagination(invoiceMatches.length, 20, JSON.stringify([invoiceSearch, fromDate, toDate]))
 
   function changeDate(kind: 'from' | 'to', value: string) {
     setDatedSales(null)
     setDateLoading(Boolean(value || (kind === 'from' ? toDate : fromDate)))
     if (kind === 'from') setFromDate(value)
     else setToDate(value)
+  }
+
+  async function deleteSale(sale: Sale) {
+    if (!window.confirm(`Xoá hoá đơn ${sale.number}? Số hàng đã bán sẽ được cộng trả vào kho.`)) return
+    try {
+      await api.deleteSale(sale.id)
+      setDatedSales(current => current?.filter(item => item.id !== sale.id) ?? null)
+      setSelectedSale(current => current?.id === sale.id ? null : current)
+      showToast('Đã xoá hoá đơn và hoàn lại số lượng vào kho.')
+      await onRefresh()
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Không xoá được hoá đơn.', 'error')
+    }
   }
 
   async function saveEdit(input: SaleInput) {
@@ -97,10 +114,11 @@ export function InvoicesPage({ active, sales, products, onRefresh, showToast }: 
             {(fromDate || toDate) && <button className="secondary-button" onClick={() => { setFromDate(''); setToDate(''); setDatedSales(null); setDateLoading(false) }}>Xoá lọc</button>}
           </div>
           {dateLoading && <div className="filter-loading">Đang lọc hoá đơn...</div>}
-          <div className="table-scroll"><table className="data-table"><thead><tr><th>MÃ HOÁ ĐƠN</th><th>THỜI GIAN</th><th>KHÁCH HÀNG</th><th>SẢN PHẨM</th><th>TỔNG TIỀN</th><th></th></tr></thead><tbody>{invoiceMatches.length ? invoiceMatches.map(sale => <tr key={sale.id}><td><strong className="invoice-number">{sale.number}</strong></td><td>{dateTime(sale.soldAt)}</td><td><div className="stacked-cell">{sale.customerName || 'Khách lẻ'}<small>{sale.customerPhone || '—'}</small></div></td><td>{sale.items.reduce((sum, item) => sum + item.quantity, 0)} sản phẩm{(sale.returns?.length ?? 0) > 0 && <small className="returned-badge">Có hàng trả</small>}</td><td><strong>{money(sale.total)}</strong></td><td><button className="view-button" onClick={() => setSelectedSale(sale)}>Xem chi tiết <ArrowRight size={15} /></button></td></tr>) : <tr><td colSpan={6}><div className="table-empty"><ReceiptText size={30} /><strong>Không có hoá đơn phù hợp</strong><span>Thử thay đổi từ khoá hoặc khoảng ngày.</span></div></td></tr>}</tbody></table></div>
+          <div className="table-scroll"><table className="data-table"><thead><tr><th>MÃ HOÁ ĐƠN</th><th>THỜI GIAN</th><th>KHÁCH HÀNG</th><th>SẢN PHẨM</th><th>TỔNG TIỀN</th><th></th></tr></thead><tbody>{invoiceMatches.length ? invoiceMatches.slice(pager.start, pager.end).map(sale => <tr key={sale.id}><td><strong className="invoice-number">{sale.number}</strong></td><td>{dateTime(sale.soldAt)}</td><td><div className="stacked-cell">{sale.customerName || 'Khách lẻ'}<small>{sale.customerPhone || '—'}</small></div></td><td>{sale.items.reduce((sum, item) => sum + item.quantity, 0)} sản phẩm{(sale.returns?.length ?? 0) > 0 && <small className="returned-badge">Có hàng trả</small>}</td><td><strong>{money(sale.total)}</strong></td><td><div className="invoice-row-actions"><button className="view-button" onClick={() => setSelectedSale(sale)}>Xem chi tiết <ArrowRight size={15} /></button>{(sale.returns?.length ?? 0) === 0 && <button className="text-danger" onClick={() => void deleteSale(sale)}>Xoá</button>}</div></td></tr>) : <tr><td colSpan={6}><div className="table-empty"><ReceiptText size={30} /><strong>Không có hoá đơn phù hợp</strong><span>Thử thay đổi từ khoá hoặc khoảng ngày.</span></div></td></tr>}</tbody></table></div>
+          <Pagination total={invoiceMatches.length} pageSize={20} page={pager.page} totalPages={pager.totalPages} start={pager.start} end={pager.end} onPageChange={pager.setPage} noun="hoá đơn" />
         </div>
       </section>
-      {selectedSale && <InvoiceDetailModal sale={selectedSale} onClose={() => setSelectedSale(null)} onEdit={() => { setEditingSale(selectedSale); setSelectedSale(null) }} onReturn={() => { setReturningSale(selectedSale); setSelectedSale(null) }} onResolveWarranty={(itemId, outcome) => void resolveWarranty(itemId, outcome)} />}
+      {selectedSale && <InvoiceDetailModal sale={selectedSale} onClose={() => setSelectedSale(null)} onEdit={() => { setEditingSale(selectedSale); setSelectedSale(null) }} onReturn={() => { setReturningSale(selectedSale); setSelectedSale(null) }} onDelete={() => void deleteSale(selectedSale)} onResolveWarranty={(itemId, outcome) => void resolveWarranty(itemId, outcome)} />}
       {editingSale && <InvoiceEditModal sale={editingSale} products={products} onClose={() => setEditingSale(null)} onSave={saveEdit} onError={message => showToast(message, 'error')} />}
       {returningSale && <ReturnModal sale={returningSale} onClose={() => setReturningSale(null)} onSave={saveReturn} onError={message => showToast(message, 'error')} />}
     </>

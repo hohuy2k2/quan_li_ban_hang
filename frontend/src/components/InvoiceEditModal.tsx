@@ -11,10 +11,11 @@ type Props = {
   onError: (message: string) => void
 }
 
+/** Sửa khách, mặt hàng, số lượng và giảm giá trước khi hóa đơn có hàng trả. */
 export function InvoiceEditModal({ sale, products, onClose, onSave, onError }: Props) {
   const [customerName, setCustomerName] = useState(sale.customerName)
   const [customerPhone, setCustomerPhone] = useState(sale.customerPhone)
-  const [lines, setLines] = useState(sale.items.map(item => ({ productId: item.productId, quantity: item.quantity })))
+  const [lines, setLines] = useState(sale.items.map(item => ({ productId: item.productId, quantity: item.quantity, discountPerUnit: item.discountPerUnit ?? 0 })))
   const [search, setSearch] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -24,19 +25,19 @@ export function InvoiceEditModal({ sale, products, onClose, onSave, onError }: P
   const total = lines.reduce((sum, line) => {
     const original = sale.items.find(item => item.productId === line.productId)
     const product = products.find(item => item.id === line.productId)
-    return sum + (original?.unitPrice ?? product?.salePrice ?? 0) * line.quantity
+    return sum + ((original?.unitPrice ?? product?.salePrice ?? 0) - line.discountPerUnit) * line.quantity
   }, 0)
 
   function addProduct(product: Product) {
     setLines(current => current.some(line => line.productId === product.id)
       ? current.map(line => line.productId === product.id ? { ...line, quantity: line.quantity + 1 } : line)
-      : [...current, { productId: product.id, quantity: 1 }])
+      : [...current, { productId: product.id, quantity: 1, discountPerUnit: 0 }])
     setSearch('')
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!lines.length || lines.some(line => line.quantity <= 0)) return onError('Hoá đơn cần có sản phẩm với số lượng hợp lệ.')
+    if (!lines.length || lines.some(line => line.quantity <= 0 || line.discountPerUnit < 0)) return onError('Hoá đơn cần có sản phẩm với số lượng hợp lệ.')
     setSaving(true)
     try {
       await onSave({ customerName, customerPhone, items: lines })
@@ -56,7 +57,7 @@ export function InvoiceEditModal({ sale, products, onClose, onSave, onError }: P
             const original = sale.items.find(item => item.productId === line.productId)
             const product = products.find(item => item.id === line.productId)
             const unitPrice = original?.unitPrice ?? product?.salePrice ?? 0
-            return <div className="invoice-edit-line" key={line.productId}><div><strong>{original?.productName ?? product?.name}</strong><small>{original?.productCode ?? product?.code} · {money(unitPrice)}/món</small></div><input type="number" min="1" step="1" aria-label={`Số lượng ${original?.productName ?? product?.name}`} value={line.quantity} onChange={event => setLines(current => current.map(item => item.productId === line.productId ? { ...item, quantity: Number(event.target.value) } : item))} /><button type="button" className="icon-button" onClick={() => setLines(current => current.filter(item => item.productId !== line.productId))} aria-label="Bỏ món khỏi hoá đơn"><Trash2 size={17} /></button></div>
+            return <div className="invoice-edit-line" key={line.productId}><div><strong>{original?.productName ?? product?.name}</strong><small>{original?.productCode ?? product?.code} · {money(unitPrice)}/món</small></div><label className="invoice-edit-discount">Giảm/món (đ)<input type="number" min="0" max={unitPrice} step="1" value={line.discountPerUnit} onChange={event => setLines(current => current.map(item => item.productId === line.productId ? { ...item, discountPerUnit: Math.max(0, Math.min(unitPrice, Math.floor(Number(event.target.value)) || 0)) } : item))} /></label><input type="number" min="1" step="1" aria-label={`Số lượng ${original?.productName ?? product?.name}`} value={line.quantity} onChange={event => setLines(current => current.map(item => item.productId === line.productId ? { ...item, quantity: Number(event.target.value) } : item))} /><button type="button" className="icon-button" onClick={() => setLines(current => current.filter(item => item.productId !== line.productId))} aria-label="Bỏ món khỏi hoá đơn"><Trash2 size={17} /></button></div>
           })}</div>
           <div className="invoice-edit-search"><label>Thêm sản phẩm</label><div className="search-field"><Search size={18} /><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Tìm theo tên hoặc mã" /></div>{search.trim() && <div className="invoice-edit-suggestions">{matches.length ? matches.map(product => <button type="button" key={product.id} onClick={() => addProduct(product)}><span>{product.name}<small>{product.code} · Còn {product.quantity}</small></span><Plus size={16} /></button>) : <div>Không tìm thấy sản phẩm.</div>}</div>}</div>
           <div className="return-refund">Tổng tiền mới <strong>{money(total)}</strong></div>

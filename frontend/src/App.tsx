@@ -1,23 +1,24 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   AlertTriangle, Barcode as BarcodeIcon, Boxes, Check, Clock3, Download,
-  FileClock, Menu, ReceiptText, RefreshCw, ShoppingCart, X,
+  FileClock, Menu, ReceiptText, RefreshCw, ShieldCheck, ShoppingCart, X,
 } from 'lucide-react'
 import { api } from './api'
 import { HistoryPage } from './pages/HistoryPage'
 import { InvoicesPage } from './pages/InvoicesPage'
 import { ProductsPage } from './pages/ProductsPage'
 import { SalesPage } from './pages/SalesPage'
+import { WarrantyPage } from './pages/WarrantyPage'
 import type { Product, ProductAudit, Sale, StockMovement, Summary } from './types'
 import { dateTime } from './utils/format'
 import './App.css'
 
-type Page = 'sales' | 'products' | 'invoices' | 'history'
+type Page = 'sales' | 'products' | 'invoices' | 'warranty' | 'history'
 type Toast = { message: string; kind: 'success' | 'error' }
 
 const pageTitles: Record<Page, string> = {
   sales: 'Bán hàng', products: 'Sản phẩm & tồn kho',
-  invoices: 'Hoá đơn', history: 'Lịch sử thay đổi',
+  invoices: 'Hoá đơn', warranty: 'Bảo hành', history: 'Lịch sử thay đổi',
 }
 
 function App() {
@@ -38,6 +39,7 @@ function App() {
     setToast({ message, kind })
   }, [])
 
+  // Nạp dữ liệu dùng chung sau mỗi thao tác có thể thay đổi kho, hóa đơn hoặc thống kê.
   const refresh = useCallback(async () => {
     try {
       const [nextProducts, nextSales, nextAudits, nextMovements, nextSummary] = await Promise.all([
@@ -101,6 +103,7 @@ function App() {
             <button className={page === 'sales' ? 'nav-item active' : 'nav-item'} onClick={() => selectPage('sales')}><ShoppingCart size={19} />Bán hàng</button>
             <button className={page === 'products' ? 'nav-item active' : 'nav-item'} onClick={() => selectPage('products')}><Boxes size={19} />Sản phẩm & kho</button>
             <button className={page === 'invoices' ? 'nav-item active' : 'nav-item'} onClick={() => selectPage('invoices')}><ReceiptText size={19} />Hoá đơn</button>
+            <button className={page === 'warranty' ? 'nav-item active' : 'nav-item'} onClick={() => selectPage('warranty')}><ShieldCheck size={19} />Bảo hành</button>
             <button className={page === 'history' ? 'nav-item active' : 'nav-item'} onClick={() => selectPage('history')}><FileClock size={19} />Lịch sử thay đổi</button>
           </nav>
           <div className="sidebar-bottom"><button className="backup-button" onClick={() => void downloadBackup()}><Download size={18} />Sao lưu dữ liệu</button><div className="local-note"><span className="online-dot" />Dữ liệu lưu trên máy này</div></div>
@@ -118,6 +121,7 @@ function App() {
             <SalesPage active={page === 'sales'} products={products} summary={summary} now={now} onRefresh={refresh} onShowInvoices={() => selectPage('invoices')} onShowLowStock={() => { setOnlyLowStock(true); selectPage('products') }} showToast={showToast} />
             <ProductsPage active={page === 'products'} products={products} summary={summary} onlyLowStock={onlyLowStock} onToggleLowStock={() => setOnlyLowStock(value => !value)} onRefresh={refresh} showToast={showToast} />
             <InvoicesPage active={page === 'invoices'} sales={sales} products={products} onRefresh={refresh} showToast={showToast} />
+            <WarrantyPage active={page === 'warranty'} products={products} onRefresh={refresh} showToast={showToast} />
             <HistoryPage active={page === 'history'} audits={audits} movements={movements} showToast={showToast} />
           </>}
         </main>

@@ -25,8 +25,10 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<InventoryDb>();
+    // Tạo DB mới, rồi bổ sung cột/bảng còn thiếu cho DB đã dùng từ phiên bản trước.
     db.Database.EnsureCreated();
     DatabaseSchema.EnsureReturnTables(db);
+    DatabaseUpgrades.Apply(db);
     db.Database.ExecuteSqlRaw("PRAGMA journal_mode=WAL;");
 }
 
@@ -127,10 +129,10 @@ app.MapGet("/api/history", async (InventoryDb db, int? productId, string? action
     if (productId.HasValue) history = history.Where(h => h.ProductId == productId.Value);
     if (!string.IsNullOrWhiteSpace(action)) history = history.Where(h => h.Action == action);
     if (string.IsNullOrWhiteSpace(query))
-        return Results.Ok(await history.OrderByDescending(h => h.At).Take(300).ToListAsync());
+        return Results.Ok(await history.OrderByDescending(h => h.At).ToListAsync());
     var term = SearchKey(query);
     var matches = (await history.OrderByDescending(h => h.At).ToListAsync())
-        .Where(h => SearchKey($"{h.ProductCode} {h.ProductName} {h.Summary}").Contains(term)).Take(300);
+        .Where(h => SearchKey($"{h.ProductCode} {h.ProductName} {h.Summary}").Contains(term));
     return Results.Ok(matches);
 });
 
@@ -141,24 +143,24 @@ app.MapGet("/api/movements", async (InventoryDb db, int? productId, string? dire
     if (direction == "in") movements = movements.Where(m => m.Change > 0);
     if (direction == "out") movements = movements.Where(m => m.Change < 0);
     if (string.IsNullOrWhiteSpace(query))
-        return Results.Ok(await movements.OrderByDescending(m => m.At).Take(300).ToListAsync());
+        return Results.Ok(await movements.OrderByDescending(m => m.At).ToListAsync());
     var term = SearchKey(query);
     var matches = (await movements.OrderByDescending(m => m.At).ToListAsync())
-        .Where(m => SearchKey($"{m.ProductCode} {m.Reason} {m.Reference}").Contains(term)).Take(300);
+        .Where(m => SearchKey($"{m.ProductCode} {m.Reason} {m.Reference}").Contains(term));
     return Results.Ok(matches);
 });
 
+// Thanh toán: trừ tồn kho và lưu giá/giảm giá tại thời điểm bán trong một giao dịch.
 app.MapPost("/api/sales", async (InventoryDb db, SaleInput input) =>
 {
     if (input.Items is null || input.Items.Count == 0)
         return Results.BadRequest(new { message = "Đơn hàng chưa có sản phẩm." });
-    if (input.Items.Any(i => i.Quantity <= 0))
+    if (input.Items.Any(i => i.Quantity <= 0 || i.DiscountPerUnit < 0) || input.Items.Select(i => i.ProductId).Distinct().Count() != input.Items.Count)
         return Results.BadRequest(new { message = "Số lượng bán phải lớn hơn 0." });
     if (input.CustomerName?.Length > 120 || input.CustomerPhone?.Length > 30)
         return Results.BadRequest(new { message = "Thông tin khách hàng quá dài." });
 
-    var lines = input.Items.GroupBy(i => i.ProductId)
-        .Select(g => new SaleLineInput(g.Key, g.Sum(i => i.Quantity))).ToList();
+    var lines = input.Items;
     await using var transaction = await db.Database.BeginTransactionAsync();
     var now = DateTime.UtcNow;
     var sale = new Sale
@@ -183,13 +185,16 @@ app.MapPost("/api/sales", async (InventoryDb db, SaleInput input) =>
         if (changed != 1)
             return Results.BadRequest(new { message = $"Sản phẩm {product.Name} không đủ tồn kho." });
 
-        var lineTotal = checked(product.SalePrice * line.Quantity);
+        if (line.DiscountPerUnit > product.SalePrice)
+            return Results.BadRequest(new { message = $"Giảm giá của {product.Name} vượt giá bán." });
+        var lineTotal = checked((product.SalePrice - line.DiscountPerUnit) * line.Quantity);
         sale.Items.Add(new SaleItem
         {
             ProductId = product.Id,
             ProductCode = product.Code,
             ProductName = product.Name,
             UnitPrice = product.SalePrice,
+            DiscountPerUnit = line.DiscountPerUnit,
             Quantity = line.Quantity,
             LineTotal = lineTotal
         });
@@ -205,7 +210,7 @@ app.MapPost("/api/sales", async (InventoryDb db, SaleInput input) =>
 
 app.MapGet("/api/sales", async (InventoryDb db, string? from, string? to) =>
 {
-    var sales = db.Sales.AsNoTracking().AsQueryable();
+    var sales = db.Sales.AsNoTracking().Where(s => !s.IsDeleted);
     if (!string.IsNullOrWhiteSpace(from))
     {
         if (!DateOnly.TryParseExact(from, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var startDate))
@@ -223,20 +228,20 @@ app.MapGet("/api/sales", async (InventoryDb db, string? from, string? to) =>
     var ordered = sales.Include(s => s.Items)
         .Include(s => s.Returns).ThenInclude(r => r.Items).AsSplitQuery()
         .OrderByDescending(s => s.SoldAt);
-    var result = string.IsNullOrWhiteSpace(from) && string.IsNullOrWhiteSpace(to)
-        ? await ordered.Take(200).ToListAsync()
-        : await ordered.ToListAsync();
+    var result = await ordered.ToListAsync();
     return Results.Ok(result);
 });
 
 app.MapSaleManagementEndpoints();
+app.MapWarrantyEndpoints();
 
+// Thống kê ngày: bỏ hóa đơn đã xóa và trừ số tiền hoàn hàng.
 app.MapGet("/api/summary", async (InventoryDb db) =>
 {
     var today = DateTime.Today.ToUniversalTime();
     var tomorrow = DateTime.Today.AddDays(1).ToUniversalTime();
     var salesToday = await db.Sales.AsNoTracking()
-        .Where(s => s.SoldAt >= today && s.SoldAt < tomorrow).ToListAsync();
+        .Where(s => !s.IsDeleted && s.SoldAt >= today && s.SoldAt < tomorrow).ToListAsync();
     var refundsToday = await db.SaleReturns.AsNoTracking()
         .Where(r => r.ReturnedAt >= today && r.ReturnedAt < tomorrow).ToListAsync();
     var active = await db.Products.AsNoTracking().Where(p => !p.IsDeleted).ToListAsync();

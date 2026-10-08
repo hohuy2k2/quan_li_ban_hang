@@ -1,5 +1,6 @@
-import type { Product, ProductAudit, ProductInput, ReturnInput, Sale, SaleInput, SaleReturn, SaleReturnItem, StockMovement, Summary } from './types'
+import type { Product, ProductAudit, ProductInput, ReturnInput, Sale, SaleInput, SaleReturn, SaleReturnItem, StockMovement, Summary, WarrantyCase, WarrantyStatus } from './types'
 
+// Mọi lời gọi backend đi qua đây để thống nhất xử lý lỗi và thông báo cho người dùng.
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   let response: Response
   try {
@@ -34,10 +35,18 @@ export const api = {
   createSale: (data: SaleInput) =>
     request<Sale>('/sales', { method: 'POST', body: JSON.stringify(data) }),
   updateSale: (id: number, data: SaleInput) => request<Sale>(`/sales/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteSale: (id: number) => request<void>(`/sales/${id}`, { method: 'DELETE' }),
   returnItems: (id: number, data: ReturnInput) => request<SaleReturn>(`/sales/${id}/returns`, { method: 'POST', body: JSON.stringify(data) }),
   resolveWarranty: (id: number, outcome: 'returned_to_customer' | 'discard') =>
     request<SaleReturnItem>(`/returns/items/${id}/warranty`, { method: 'PATCH', body: JSON.stringify({ outcome }) }),
   history: (filters?: { action?: string; query?: string }) => request<ProductAudit[]>(`/history${filters ? `?${new URLSearchParams(Object.entries(filters).filter(([, value]) => Boolean(value)) as [string, string][]).toString()}` : ''}`),
   movements: (filters?: { direction?: string; query?: string }) => request<StockMovement[]>(`/movements${filters ? `?${new URLSearchParams(Object.entries(filters).filter(([, value]) => Boolean(value)) as [string, string][]).toString()}` : ''}`),
+  warranties: () => request<WarrantyCase[]>('/warranties'),
+  createCustomerWarranty: (data: { productId: number; quantity: number; customerName: string; customerPhone: string; saleNumber: string; issue: string }) =>
+    request<WarrantyCase>('/warranties/customer', { method: 'POST', body: JSON.stringify(data) }),
+  createInternalWarranty: (data: { productId: number; quantity: number; issue: string }) =>
+    request<WarrantyCase>('/warranties/internal', { method: 'POST', body: JSON.stringify(data) }),
+  updateWarranty: (id: number, data: { status: WarrantyStatus; note: string; partner: string }) =>
+    request<WarrantyCase>(`/warranties/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   summary: () => request<Summary>('/summary'),
 }

@@ -22,3 +22,47 @@
 .history-controls{display:flex;align-items:center;gap:12px;margin-bottom:15px;flex-wrap:wrap}.history-controls .search-field{flex:1;min-width:220px;max-width:420px}.history-filter-buttons{display:flex;flex-wrap:wrap;gap:6px}.history-filter-buttons button{border:1px solid #e1e8ef;background:#fff;color:#687c92;padding:9px 12px;border-radius:7px;font-size:11px;font-weight:700}.history-filter-buttons button.selected{background:#eaf1fc;color:#2e6cca;border-color:#c9ddfa}.history-invoice-link{border:0;background:none;padding:0;color:#2567cb;text-decoration:underline;font-size:inherit;cursor:pointer}
 .invoice-edit-modal,.return-modal{max-width:720px}.invoice-edit-customer{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}.invoice-edit-customer label,.return-reason{display:grid;gap:7px;color:#4a5d72;font-size:11px;font-weight:700}.invoice-edit-customer input,.return-reason textarea{border:1px solid #e1e8ef;border-radius:7px;padding:10px;color:#26394f;font-size:12px;width:100%;font-family:inherit}.return-reason textarea{min-height:80px;resize:vertical}.return-reason em{color:#de5f5f;font-style:normal}.invoice-edit-lines{max-height:250px;overflow-y:auto;border-top:1px solid #edf0f4}.invoice-edit-line{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid #edf0f4}.invoice-edit-line>div{flex:1;min-width:0}.invoice-edit-line strong,.return-line-heading strong{display:block;color:#26394d;font-size:12px}.invoice-edit-line small,.return-line-heading span{display:block;color:#94a1b1;font-size:10px;margin-top:4px}.invoice-edit-line input{width:68px;height:36px;border:1px solid #e1e8ef;border-radius:7px;padding:0 8px}.invoice-edit-search{position:relative;margin-top:17px}.invoice-edit-search>label{display:block;color:#4a5d72;font-size:11px;font-weight:700;margin-bottom:8px}.invoice-edit-suggestions{position:absolute;z-index:4;left:0;right:0;max-height:230px;overflow:auto;background:#fff;border:1px solid #e2e9f0;border-radius:8px;box-shadow:0 12px 25px rgba(17,38,66,.15)}.invoice-edit-suggestions button{display:flex;align-items:center;justify-content:space-between;width:100%;padding:10px 12px;border:0;border-bottom:1px solid #edf0f4;background:#fff;color:#26394d;text-align:left;font-size:11px}.invoice-edit-suggestions button:hover{background:#f5f9ff}.invoice-edit-suggestions small{display:block;color:#94a1b1;margin-top:3px}.invoice-edit-suggestions>div{padding:12px;font-size:11px;color:#94a1b1}.return-lines{max-height:330px;overflow-y:auto}.return-line{padding:13px 0;border-bottom:1px solid #edf0f4}.return-dispositions{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:11px}.return-dispositions label{display:grid;gap:3px;color:#526579;font-size:11px;font-weight:700}.return-dispositions small{color:#94a1b1;font-size:9px;font-weight:400}.return-dispositions input{width:100%;height:36px;border:1px solid #e1e8ef;border-radius:7px;padding:0 8px}.return-reason{margin-top:18px}.return-refund{display:flex;justify-content:space-between;align-items:center;margin-top:18px;padding:14px;border-radius:8px;background:#f5f9ff;color:#526579;font-size:12px;font-weight:700}.return-refund strong{color:#2468c6;font-size:16px}.invoice-total .refund-text{color:#c46b36}.invoice-returns{margin-top:20px;border-top:1px solid #edf0f4;padding-top:16px}.invoice-returns h3{font-size:13px;color:#26394d;margin-bottom:10px}.invoice-return{border:1px solid #e6ebf0;border-radius:8px;padding:12px;margin-bottom:10px}.invoice-return-heading{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:#2f6cbe}.invoice-return-heading time{color:#94a1b1}.invoice-return p{font-size:11px;color:#607389;margin:6px 0 10px}.invoice-return-item{display:flex;align-items:start;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid #edf0f4;font-size:11px;color:#42576b;flex-wrap:wrap}.invoice-return-item small{display:block;color:#91a0ae;margin-top:4px}.invoice-return-item>strong{white-space:nowrap}.warranty-actions{display:flex;gap:6px;width:100%}.warranty-actions button{border:1px solid #dce5ed;border-radius:6px;background:#fff;color:#3c6eab;padding:5px 8px;font-size:10px;cursor:pointer}
 @media(max-width:720px){.invoice-toolbar .invoice-search{flex-basis:100%}.invoice-toolbar label{flex:1}.history-controls .search-field{max-width:none;flex-basis:100%}.invoice-edit-customer{grid-template-columns:1fr}.return-dispositions{gap:5px}.return-dispositions label{font-size:10px}}
+
+.cart-discount,.invoice-edit-discount{display:grid;gap:4px;color:#7f8fa1;font-size:10px;font-weight:700;white-space:nowrap}
+.cart-discount input,.invoice-edit-discount input{width:92px;height:31px;border:1px solid #e1e8ef;border-radius:6px;padding:0 7px;color:#26394f;font-size:11px}
+.invoice-edit-discount input{width:100px}
+.warranty-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:20px}
+.warranty-summary>div{border:1px solid #e5ebf0;background:#fff;border-radius:10px;padding:15px 18px}
+.warranty-summary span{display:block;color:#92a0ae;font-size:11px}
+.warranty-summary strong{display:block;color:#253950;font-size:21px;margin-top:8px}
+.warranty-panel{overflow:hidden}.warranty-toolbar{display:flex;gap:12px;align-items:center;padding:17px 18px}
+.warranty-toolbar .search-field{flex:1;max-width:480px}
+.warranty-toolbar select,.warranty-form select{height:42px;border:1px solid #e2e8ef;border-radius:8px;background:#fff;color:#526579;padding:0 11px;font-size:11px}
+.warranty-subline{display:block;color:#9aa7b6;font-size:10px;margin-top:5px}
+.warranty-status{display:inline-block;border-radius:6px;background:#eaf4ff;color:#3470bd;padding:6px 9px;font-size:10px;font-weight:700}
+.warranty-status.closed{background:#e9f8ef;color:#279567}
+.warranty-modal{max-width:650px}.warranty-form,.warranty-update{display:grid;gap:14px}
+.warranty-form label,.warranty-update label{display:grid;gap:6px;color:#4a5d72;font-size:11px;font-weight:700}
+.warranty-form input,.warranty-form textarea,.warranty-form select,.warranty-update input,.warranty-update textarea{width:100%;border:1px solid #e1e8ef;border-radius:7px;padding:10px;color:#26394f;font:inherit;font-size:12px}
+.warranty-form textarea,.warranty-update textarea{min-height:75px;resize:vertical}
+.warranty-detail{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding-bottom:18px;border-bottom:1px solid #edf0f4}
+.warranty-detail div{min-width:0}.warranty-detail span{display:block;color:#95a3b2;font-size:10px;margin-bottom:5px}.warranty-detail strong{color:#2d4156;font-size:12px;overflow-wrap:anywhere}
+.warranty-timeline{padding:18px 0;border-bottom:1px solid #edf0f4}.warranty-timeline h3{font-size:12px;color:#26394d;margin-bottom:12px}
+.warranty-timeline>div{display:flex;gap:9px;align-items:flex-start;margin:12px 0;color:#5380b7;font-size:11px}
+.warranty-timeline>div span{flex:1}.warranty-timeline>div strong{display:block;color:#40556b}.warranty-timeline small{display:block;color:#8393a3;margin-top:4px}.warranty-timeline time{font-size:10px;color:#9daaba;white-space:nowrap}
+.warranty-update{padding-top:18px}.warranty-next{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.warranty-next span{color:#7c8d9e;font-size:11px;width:100%}
+.warranty-next button{border:1px solid #bcd2ef;background:#f3f8ff;color:#2d69b3;border-radius:7px;padding:9px 12px;font-size:11px;font-weight:700}.warranty-next button.danger{border-color:#f0d0d0;background:#fff5f4;color:#b75b5b}
+.warranty-update p{display:flex;align-items:flex-start;gap:6px;color:#8595a5;font-size:10px;line-height:1.5}
+@media(max-width:900px){.warranty-toolbar{flex-wrap:wrap}.warranty-toolbar .search-field{max-width:none;flex-basis:100%}}
+@media(max-width:720px){.cart-discount{margin-left:48px}.warranty-summary{gap:7px}.warranty-summary>div{padding:10px}.warranty-summary span{font-size:9px}.warranty-summary strong{font-size:16px}.warranty-detail{grid-template-columns:1fr}.warranty-toolbar select{flex:1}}
+.warranty-heading-actions{display:flex;gap:9px;flex-wrap:wrap}.warranty-heading-actions .secondary-button{display:inline-flex;align-items:center;gap:7px}
+@media(max-width:720px){.warranty-page .page-heading{flex-wrap:wrap}.warranty-heading-actions{width:100%}}
+
+.pagination{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 18px;border-top:1px solid #eef1f4;background:#fff;color:#8190a0;font-size:11px;flex-wrap:wrap}
+.pagination nav{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.pagination button{border:1px solid #dfe6ed;border-radius:6px;background:#fff;color:#48627d;padding:7px 10px;font-size:11px;cursor:pointer}
+.pagination button:hover:not(:disabled){border-color:#8eb1e4;color:#2567cb}
+.pagination button:disabled{opacity:.45;cursor:default}
+.pagination strong{color:#26394f;font-size:11px;padding:0 7px}
+.history-panel+.pagination{border:1px solid #e5ebf0;border-radius:0 0 10px 10px;margin-top:-1px}
+.danger-button{color:#b84f59;border-color:#e9bfc4}
+.danger-button:hover{background:#fff2f2}
+.deleted-invoice-badge{display:inline-block;margin-top:6px;padding:5px 8px;border-radius:5px;background:#f2f3f5;color:#7d8895;font-size:10px;font-weight:700}
+.invoice-delete-note{align-self:center;margin-right:auto;color:#a36b42;font-size:10px}
+@media(max-width:720px){.pagination{align-items:flex-start}.pagination nav{width:100%;justify-content:space-between}.pagination button{padding:7px 8px}.invoice-delete-note{width:100%}}
+.invoice-row-actions{display:flex;align-items:center;gap:12px;white-space:nowrap}
