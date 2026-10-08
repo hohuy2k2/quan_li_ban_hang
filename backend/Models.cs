@@ -95,6 +95,36 @@ public sealed class SaleItem
     public long LineTotal { get; set; }
 }
 
+// Đơn khách gửi từ website chỉ thành hoá đơn sau khi cửa hàng xác nhận.
+public sealed class OnlineOrder
+{
+    public int Id { get; set; }
+    public string Number { get; set; } = "";
+    public string CustomerName { get; set; } = "";
+    public string CustomerPhone { get; set; } = "";
+    public string Fulfillment { get; set; } = "pickup";
+    public string Address { get; set; } = "";
+    public string Note { get; set; } = "";
+    public string Status { get; set; } = "pending";
+    public DateTime CreatedAt { get; set; }
+    public DateTime? ProcessedAt { get; set; }
+    public int? SaleId { get; set; }
+    public long Total { get; set; }
+    public List<OnlineOrderItem> Items { get; set; } = [];
+}
+
+public sealed class OnlineOrderItem
+{
+    public int Id { get; set; }
+    public int OnlineOrderId { get; set; }
+    public int ProductId { get; set; }
+    public string ProductCode { get; set; } = "";
+    public string ProductName { get; set; } = "";
+    public long UnitPrice { get; set; }
+    public int Quantity { get; set; }
+    public long LineTotal { get; set; }
+}
+
 public sealed class SaleReturn
 {
     public int Id { get; set; }
@@ -173,6 +203,8 @@ public sealed class InventoryDb(DbContextOptions<InventoryDb> options) : DbConte
     public DbSet<StockDocumentLine> StockDocumentLines => Set<StockDocumentLine>();
     public DbSet<Sale> Sales => Set<Sale>();
     public DbSet<SaleItem> SaleItems => Set<SaleItem>();
+    public DbSet<OnlineOrder> OnlineOrders => Set<OnlineOrder>();
+    public DbSet<OnlineOrderItem> OnlineOrderItems => Set<OnlineOrderItem>();
     public DbSet<SaleReturn> SaleReturns => Set<SaleReturn>();
     public DbSet<SaleReturnItem> SaleReturnItems => Set<SaleReturnItem>();
     public DbSet<WarrantyCase> WarrantyCases => Set<WarrantyCase>();
@@ -187,6 +219,8 @@ public sealed class InventoryDb(DbContextOptions<InventoryDb> options) : DbConte
         modelBuilder.Entity<StockDocument>().HasMany(d => d.Lines).WithOne().HasForeignKey(l => l.StockDocumentId);
         modelBuilder.Entity<Sale>().HasIndex(s => s.Number).IsUnique();
         modelBuilder.Entity<Sale>().HasMany(s => s.Items).WithOne().HasForeignKey(i => i.SaleId);
+        modelBuilder.Entity<OnlineOrder>().HasIndex(o => o.Number).IsUnique();
+        modelBuilder.Entity<OnlineOrder>().HasMany(o => o.Items).WithOne().HasForeignKey(i => i.OnlineOrderId);
         modelBuilder.Entity<Sale>().HasMany(s => s.Returns).WithOne().HasForeignKey(r => r.SaleId);
         modelBuilder.Entity<SaleReturn>().HasIndex(r => r.Number).IsUnique();
         modelBuilder.Entity<SaleReturn>().HasMany(r => r.Items).WithOne().HasForeignKey(i => i.SaleReturnId);
@@ -215,6 +249,8 @@ public sealed record StockDocumentLineInput(int ProductId, int Quantity, long? P
 public sealed record StockDocumentInput(string Kind, string DocumentDate, string? Supplier, string? Reason, List<StockDocumentLineInput> Items);
 public sealed record SaleLineInput(int ProductId, int Quantity, long DiscountPerUnit = 0);
 public sealed record SaleInput(string? CustomerName, string? CustomerPhone, List<SaleLineInput> Items);
+public sealed record OnlineOrderLineInput(int ProductId, int Quantity);
+public sealed record OnlineOrderInput(string? CustomerName, string? CustomerPhone, string? Fulfillment, string? Address, string? Note, List<OnlineOrderLineInput>? Items);
 public sealed record ReturnLineInput(int SaleItemId, int Quantity, string Disposition, bool Refund);
 public sealed record SaleReturnInput(string? Reason, List<ReturnLineInput> Items);
 public sealed record WarrantyResolutionInput(string Outcome);

@@ -1,4 +1,4 @@
-import type { Product, ProductAudit, ProductInput, ReturnInput, Sale, SaleInput, SaleReturn, SaleReturnItem, StockMovement, StockDocument, StockDocumentInput, Summary, WarrantyCase, WarrantyStatus } from './types'
+import type { OnlineOrder, Product, ProductAudit, ProductInput, ReturnInput, Sale, SaleInput, SaleReturn, SaleReturnItem, StockMovement, StockDocument, StockDocumentInput, Summary, WarrantyCase, WarrantyStatus } from './types'
 
 // Mọi lời gọi backend đi qua đây để thống nhất xử lý lỗi và thông báo cho người dùng.
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -21,6 +21,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   products: () => request<Product[]>('/products'),
+  onlineOrders: () => request<OnlineOrder[]>('/online-orders'),
+  confirmOnlineOrder: (id: number) => request<OnlineOrder>(`/online-orders/${id}/confirm`, { method: 'POST' }),
+  cancelOnlineOrder: (id: number) => request<OnlineOrder>(`/online-orders/${id}/cancel`, { method: 'POST' }),
   nextCode: () => request<{ code: string }>('/products/next-code'),
   lookup: (code: string) => request<Product>(`/products/lookup/${encodeURIComponent(code)}`),
   createProduct: (input: ProductInput) => request<Product>('/products', {

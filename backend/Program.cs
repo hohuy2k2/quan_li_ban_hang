@@ -34,6 +34,11 @@ using (var scope = app.Services.CreateScope())
 
 app.UseDefaultFiles();
 app.UseStaticFiles();
+app.MapGet("/store", () =>
+{
+    var index = Path.Combine(app.Environment.WebRootPath ?? "", "store", "index.html");
+    return File.Exists(index) ? Results.File(index, "text/html") : Results.NotFound();
+});
 
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }));
 
@@ -234,6 +239,7 @@ app.MapGet("/api/sales", async (InventoryDb db, string? from, string? to) =>
 });
 
 app.MapSaleManagementEndpoints();
+app.MapOnlineOrderEndpoints();
 app.MapWarrantyEndpoints();
 app.MapStockDocumentEndpoints();
 

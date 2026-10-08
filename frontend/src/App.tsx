@@ -1,31 +1,34 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
   AlertTriangle, Barcode as BarcodeIcon, Boxes, Check, Clock3, Download,
-  FileClock, Menu, ReceiptText, RefreshCw, ShieldCheck, ShoppingCart, ClipboardList, X,
+  FileClock, Menu, ReceiptText, RefreshCw, ShieldCheck, ShoppingCart, ClipboardList, Globe2, X,
 } from 'lucide-react'
 import { api } from './api'
 import { HistoryPage } from './pages/HistoryPage'
 import { InvoicesPage } from './pages/InvoicesPage'
+import { OnlineOrdersPage } from './pages/OnlineOrdersPage'
 import { ProductsPage } from './pages/ProductsPage'
 import { SalesPage } from './pages/SalesPage'
 import { StockPage } from './pages/StockPage'
 import { WarrantyPage } from './pages/WarrantyPage'
-import type { Product, ProductAudit, Sale, StockMovement, Summary } from './types'
+import type { OnlineOrder, Product, ProductAudit, Sale, StockMovement, Summary } from './types'
 import { dateTime } from './utils/format'
 import './App.css'
 
-type Page = 'sales' | 'products' | 'stock' | 'invoices' | 'warranty' | 'history'
+type Page = 'sales' | 'products' | 'stock' | 'invoices' | 'onlineOrders' | 'warranty' | 'history'
 type Toast = { message: string; kind: 'success' | 'error' }
 
 const pageTitles: Record<Page, string> = {
   sales: 'Bán hàng', products: 'Sản phẩm & tồn kho',
   stock: 'Phiếu kho', invoices: 'Hoá đơn', warranty: 'Bảo hành', history: 'Lịch sử thay đổi',
+  onlineOrders: 'Đơn online',
 }
 
 function App() {
   const [page, setPage] = useState<Page>('sales')
   const [products, setProducts] = useState<Product[]>([])
   const [sales, setSales] = useState<Sale[]>([])
+  const [onlineOrders, setOnlineOrders] = useState<OnlineOrder[]>([])
   const [audits, setAudits] = useState<ProductAudit[]>([])
   const [movements, setMovements] = useState<StockMovement[]>([])
   const [summary, setSummary] = useState<Summary | null>(null)
@@ -43,11 +46,12 @@ function App() {
   // Nạp dữ liệu dùng chung sau mỗi thao tác có thể thay đổi kho, hóa đơn hoặc thống kê.
   const refresh = useCallback(async () => {
     try {
-      const [nextProducts, nextSales, nextAudits, nextMovements, nextSummary] = await Promise.all([
-        api.products(), api.sales(), api.history(), api.movements(), api.summary(),
+      const [nextProducts, nextSales, nextAudits, nextMovements, nextSummary, nextOnlineOrders] = await Promise.all([
+        api.products(), api.sales(), api.history(), api.movements(), api.summary(), api.onlineOrders(),
       ])
       setProducts([...nextProducts].sort((a, b) => a.name.localeCompare(b.name, 'vi')))
       setSales(nextSales)
+      setOnlineOrders(nextOnlineOrders)
       setAudits(nextAudits)
       setMovements(nextMovements)
       setSummary(nextSummary)
@@ -105,6 +109,7 @@ function App() {
             <button className={page === 'products' ? 'nav-item active' : 'nav-item'} onClick={() => selectPage('products')}><Boxes size={19} />Sản phẩm & kho</button>
             <button className={page === 'stock' ? 'nav-item active' : 'nav-item'} onClick={() => selectPage('stock')}><ClipboardList size={19} />Nhập kho / kiểm kê</button>
             <button className={page === 'invoices' ? 'nav-item active' : 'nav-item'} onClick={() => selectPage('invoices')}><ReceiptText size={19} />Hoá đơn</button>
+            <button className={page === 'onlineOrders' ? 'nav-item active' : 'nav-item'} onClick={() => selectPage('onlineOrders')}><Globe2 size={19} />Đơn online{onlineOrders.some(o => o.status === 'pending') && <span className="nav-count">{onlineOrders.filter(o => o.status === 'pending').length}</span>}</button>
             <button className={page === 'warranty' ? 'nav-item active' : 'nav-item'} onClick={() => selectPage('warranty')}><ShieldCheck size={19} />Bảo hành</button>
             <button className={page === 'history' ? 'nav-item active' : 'nav-item'} onClick={() => selectPage('history')}><FileClock size={19} />Lịch sử thay đổi</button>
           </nav>
@@ -124,6 +129,7 @@ function App() {
             <ProductsPage active={page === 'products'} products={products} summary={summary} onlyLowStock={onlyLowStock} onToggleLowStock={() => setOnlyLowStock(value => !value)} onRefresh={refresh} showToast={showToast} />
             <StockPage active={page === 'stock'} products={products} onRefresh={refresh} showToast={showToast} />
             <InvoicesPage active={page === 'invoices'} sales={sales} products={products} onRefresh={refresh} showToast={showToast} />
+            <OnlineOrdersPage active={page === 'onlineOrders'} orders={onlineOrders} onRefresh={refresh} showToast={showToast} />
             <WarrantyPage active={page === 'warranty'} products={products} onRefresh={refresh} showToast={showToast} />
             <HistoryPage active={page === 'history'} audits={audits} movements={movements} showToast={showToast} />
           </>}

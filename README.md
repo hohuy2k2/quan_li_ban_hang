@@ -4,12 +4,14 @@
 
 ## Chức năng hiện có
 
+- Website khách hàng ở `/store/`: xem danh mục, tìm/lọc sản phẩm, thêm giỏ hàng và gửi đơn để cửa hàng xác nhận. Mục **Đơn online** trong phần quản lý cho phép xác nhận (tạo hoá đơn, trừ kho) hoặc huỷ đơn. Khi khách mới gửi đơn, tồn kho chưa bị trừ. Chưa có thanh toán online hoặc tính phí vận chuyển.
+
 - Thêm, xem, sửa, xoá mềm sản phẩm; lưu mã, tên, hãng, loại, giá nhập, trạng thái thuế của giá nhập, giá bán và số lượng.
 - Danh sách sắp xếp theo tên; tìm theo tên, mã, hãng, loại (tìm không dấu); lọc theo hãng và loại.
 - Nhật ký thêm/sửa/xoá sản phẩm và biến động số lượng.
 - Trang **Nhập kho / kiểm kê** tạo phiếu nhiều sản phẩm, có ngày phiếu, nhà cung cấp, lý do, số lượng và giá nhập theo từng dòng. Phiếu kiểm kê nhập số lượng đếm thực tế; hệ thống lưu tồn trước/sau và biến động trong cùng giao dịch. Sản phẩm mới có tồn 0; muốn thay đổi tồn hãy lập phiếu thay vì sửa số lượng trong form sản phẩm.
 
-- In tem 50 × 30 mm gồm tên, giá bán và mã vạch Code 128.
+- In tem 35 × 22 mm hoặc 50 × 30 mm gồm tên, giá bán và mã vạch Code 128.
 - Bán hàng bằng mã quét hoặc tìm thủ công. Sau khi quét xong, sản phẩm tự vào đơn mà không cần Enter; quét lại cùng mã tăng số lượng.
 - Giảm giá bằng số tiền trên mỗi món trong giỏ hàng; hóa đơn lưu giá gốc, mức giảm và thành tiền. Khi trả hàng, tiền hoàn dựa trên giá đã trả sau giảm.
 - Nhập tên, số điện thoại khách và xem thời gian, tổng tiền ở bên phải. Thanh toán lưu hoá đơn và trừ kho trong cùng giao dịch.
@@ -34,6 +36,7 @@ Khi đã ghi nhận hàng trả, hoá đơn được giữ nguyên để đối 
 - `frontend/src/utils/format.ts`: định dạng tiền, ngày giờ, tìm kiếm và nội dung lịch sử.
 - `frontend/src/hooks/usePagination.ts`: tính trang hiện tại và tự quay về trang 1 khi bộ lọc thay đổi.
 - `frontend/src/api.ts` và `frontend/src/types.ts`: gọi backend và khai báo kiểu dữ liệu.
+- `storefront/`: website React riêng cho khách hàng. `src/App.tsx` chỉ ghép các phần và giữ trạng thái dùng chung; `src/components/` chứa đầu trang, danh mục, giỏ hàng và biểu mẫu đặt hàng; `src/hooks/` quản lý sản phẩm và giỏ hàng; `src/api.ts` gọi backend; `src/types.ts` khai báo dữ liệu; `src/utils/format.ts` định dạng tiền và tìm kiếm. Các hàm chính có ghi chú ngay trong mã. API `/api/store/products` chỉ xuất thông tin bán hàng, không xuất giá nhập hoặc số tồn chính xác.
 
 ## Cài công cụ và thư viện (bạn tự chạy)
 
@@ -41,7 +44,10 @@ Cài **Node.js** và **.NET SDK 10** trên máy lập trình. Sau đó mở Powe
 
 ```powershell
 cd frontend
-npm install
+npm.cmd install
+cd ..
+cd storefront
+npm.cmd install
 cd ..
 dotnet restore backend\backend.csproj
 ```
@@ -58,10 +64,19 @@ dotnet run --project backend
 
 ```powershell
 cd frontend
-npm run dev
+npm.cmd run dev
 ```
 
 Mở địa chỉ Vite hiển thị trong cửa sổ thứ hai. Giao diện sẽ gửi yêu cầu API tới backend ở cổng 5000.
+
+Để chạy thử website khách hàng, mở cửa sổ PowerShell thứ ba:
+
+```powershell
+cd storefront
+npm.cmd run dev
+```
+
+Mở `http://127.0.0.1:5174/store/`. Cần giữ backend đang chạy. Website chỉ hiển thị sản phẩm đang còn hàng hoặc đã hết hàng; sản phẩm đã xoá không xuất hiện. Hiện mọi sản phẩm chưa xoá đều hiện trên website.
 
 ## Đóng gói để dùng tại cửa hàng
 
@@ -73,7 +88,13 @@ Sau khi cài thư viện, chạy một lần khi phát hành phiên bản mới:
 
 Thư mục `release` chứa ứng dụng đã đóng gói. Sau đó có thể nhấp đúp `scripts\Start-Local.cmd`: chương trình sẽ khởi động ứng dụng và mở `http://127.0.0.1:5000` trong trình duyệt. Người bán hàng không phải chạy `npm run build`.
 
-Để tự chạy sau khi đăng nhập Windows, tạo một tác vụ trong **Task Scheduler** chạy `scripts\Start-Local.cmd` với tài khoản Windows dùng tại quầy. Máy in tem cần được cài driver và khổ giấy 50 × 30 mm trước khi in.
+Sau khi đóng gói, website khách hàng chạy trên cùng máy tại `http://127.0.0.1:5000/store/`.
+
+## Đưa website lên Internet
+
+Phiên bản này dùng để chạy thử trên máy cửa hàng. **Không mở cổng backend hiện tại ra Internet**: các API quản lý sản phẩm, hoá đơn và sao lưu chưa có đăng nhập. Khi đưa website lên mạng, cần chuyển API/DB dùng chung lên máy chủ hoặc xây cơ chế đồng bộ, tách API công khai khỏi API quản trị, thêm đăng nhập và giới hạn yêu cầu đặt hàng. Không dùng tệp SQLite đang mở trong thư mục Google Drive làm database trực tiếp; chỉ đồng bộ bản sao lưu được tạo an toàn.
+
+Để tự chạy sau khi đăng nhập Windows, tạo một tác vụ trong **Task Scheduler** chạy `scripts\Start-Local.cmd` với tài khoản Windows dùng tại quầy. Máy in tem cần được cài driver Windows; chọn đúng khổ giấy 35 × 22 mm hoặc 50 × 30 mm trong hộp thoại in và driver.
 
 ## Dữ liệu và sao lưu
 

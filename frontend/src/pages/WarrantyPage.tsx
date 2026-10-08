@@ -21,7 +21,7 @@ const statusNames: Record<WarrantyStatus, string> = {
   restocked: 'Đã nhập lại kho',
   discarded: 'Đã bỏ đi',
 }
-const closed: WarrantyStatus[] = ['returned_to_customer', 'restocked', 'discarded']
+const closed: Set<WarrantyStatus> = new Set(['returned_to_customer', 'restocked', 'discarded'])
 
 type UnitDraft = { serialNumber: string; warrantyExpiresOn: string }
 
@@ -82,9 +82,9 @@ export function WarrantyPage({ active, products, onRefresh, showToast }: Props) 
     String(todayDate.getDate()).padStart(2, '0')].join('-')
   const filtered = useMemo(() => cases.filter(item => {
     if (sourceFilter && item.source !== sourceFilter) return false
-    if (statusFilter === 'open' && closed.includes(item.status)) return false
-    if (statusFilter === 'closed' && !closed.includes(item.status)) return false
-    if (statusFilter === 'overdue' && (closed.includes(item.status) || !item.expectedReturnOn || item.expectedReturnOn >= todayKey)) return false
+    if (statusFilter === 'open' && closed.has(item.status)) return false
+    if (statusFilter === 'closed' && !closed.has(item.status)) return false
+    if (statusFilter === 'overdue' && (closed.has(item.status) || !item.expectedReturnOn || item.expectedReturnOn >= todayKey)) return false
     const term = searchKey(search)
     return !term || searchKey([item.number, item.saleNumber, item.productCode, item.productName,
       item.customerName, item.customerPhone, item.issue, item.partner, ...(item.units ?? []).map(unit => unit.serialNumber)].join(' ')).includes(term)
@@ -133,7 +133,7 @@ export function WarrantyPage({ active, products, onRefresh, showToast }: Props) 
 
   async function updateStatus(status: WarrantyStatus) {
     if (!selected) return
-    if (closed.includes(status) && !window.confirm(`Xác nhận: ${statusNames[status].toLowerCase()}?`)) return
+    if (closed.has(status) && !window.confirm(`Xác nhận: ${statusNames[status].toLowerCase()}?`)) return
     setSaving(true)
     try {
       await api.updateWarranty(selected.id, { status, note: note.trim(), partner: partner.trim() })
@@ -167,12 +167,12 @@ export function WarrantyPage({ active, products, onRefresh, showToast }: Props) 
 
   return <section className="page-content warranty-page" style={{ display: active ? undefined : 'none' }}>
     <div className="page-heading"><div><div className="eyebrow">THEO DÕI XỬ LÝ</div><h1>Bảo hành sản phẩm</h1><p>Quản lý hàng khách gửi bảo hành và hàng lỗi của cửa hàng.</p></div><div className="warranty-heading-actions"><button className="secondary-button" onClick={() => openCreate('customer')}><Plus size={17} />Nhận từ khách</button><button className="primary-button" onClick={() => openCreate('internal')}><Plus size={17} />Hàng lỗi trong kho</button></div></div>
-    <div className="warranty-summary"><div><span>Đang xử lý</span><strong>{cases.filter(item => !closed.includes(item.status)).length}</strong></div><div><span>Từ khách hàng</span><strong>{cases.filter(item => item.source === 'customer').length}</strong></div><div><span>Hàng lỗi trong kho</span><strong>{cases.filter(item => item.source === 'internal').length}</strong></div></div>
+    <div className="warranty-summary"><div><span>Đang xử lý</span><strong>{cases.filter(item => !closed.has(item.status)).length}</strong></div><div><span>Từ khách hàng</span><strong>{cases.filter(item => item.source === 'customer').length}</strong></div><div><span>Hàng lỗi trong kho</span><strong>{cases.filter(item => item.source === 'internal').length}</strong></div></div>
     <div className="panel warranty-panel">
       <div className="warranty-toolbar"><div className="search-field"><Search size={18} /><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Tìm mã phiếu, hóa đơn, sản phẩm hoặc khách hàng" /></div><select value={sourceFilter} onChange={event => setSourceFilter(event.target.value)} aria-label="Nguồn hàng"><option value="">Mọi nguồn</option><option value="customer">Khách hàng</option><option value="internal">Hàng trong kho</option></select><select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} aria-label="Trạng thái"><option value="">Mọi trạng thái</option><option value="open">Đang xử lý</option><option value="closed">Đã kết thúc</option><option value="overdue">Quá hẹn</option></select></div>
       {loading && <div className="filter-loading">Đang tải phiếu bảo hành...</div>}
       <div className="table-scroll"><table className="data-table"><thead><tr><th>MÃ PHIẾU</th><th>SẢN PHẨM</th><th>NGUỒN / KHÁCH</th><th>NGÀY NHẬN</th><th>TRẠNG THÁI</th><th></th></tr></thead><tbody>
-        {filtered.slice(pager.start, pager.end).map(item => <tr key={item.id}><td><strong className="invoice-number">{item.number}</strong>{item.saleNumber && <small className="warranty-subline">HĐ {item.saleNumber}</small>}</td><td><strong>{item.productName}</strong><small className="warranty-subline">{item.productCode} · {item.quantity} món</small></td><td>{item.source === 'customer' ? item.customerName || 'Khách lẻ' : 'Hàng trong kho'}{item.customerPhone && <small className="warranty-subline">{item.customerPhone}</small>}</td><td>{dateTime(item.createdAt)}{item.expectedReturnOn && <small className={item.expectedReturnOn < todayKey && !closed.includes(item.status) ? "warranty-subline warranty-overdue" : "warranty-subline"}>Hẹn: {item.expectedReturnOn.split("-").reverse().join("/")}{item.expectedReturnOn < todayKey && !closed.includes(item.status) && " · quá hẹn"}</small>}</td><td><span className={`warranty-status ${closed.includes(item.status) ? 'closed' : ''}`}>{statusNames[item.status]}</span></td><td><button className="view-button" onClick={() => openCase(item)}>Xem / cập nhật</button></td></tr>)}
+        {filtered.slice(pager.start, pager.end).map(item => <tr key={item.id}><td><strong className="invoice-number">{item.number}</strong>{item.saleNumber && <small className="warranty-subline">HĐ {item.saleNumber}</small>}</td><td><strong>{item.productName}</strong><small className="warranty-subline">{item.productCode} · {item.quantity} món</small></td><td>{item.source === 'customer' ? item.customerName || 'Khách lẻ' : 'Hàng trong kho'}{item.customerPhone && <small className="warranty-subline">{item.customerPhone}</small>}</td><td>{dateTime(item.createdAt)}{item.expectedReturnOn && <small className={item.expectedReturnOn < todayKey && !closed.has(item.status) ? "warranty-subline warranty-overdue" : "warranty-subline"}>Hẹn: {item.expectedReturnOn.split("-").reverse().join("/")}{item.expectedReturnOn < todayKey && !closed.has(item.status) && " · quá hẹn"}</small>}</td><td><span className={`warranty-status ${closed.has(item.status) ? 'closed' : ''}`}>{statusNames[item.status]}</span></td><td><button className="view-button" onClick={() => openCase(item)}>Xem / cập nhật</button></td></tr>)}
         {!filtered.length && <tr><td colSpan={6}><div className="table-empty"><ClipboardList size={30} /><strong>Không có phiếu bảo hành phù hợp</strong></div></td></tr>}
       </tbody></table></div>
       <Pagination total={filtered.length} pageSize={20} page={pager.page} totalPages={pager.totalPages} start={pager.start} end={pager.end} onPageChange={pager.setPage} noun="phiếu bảo hành" />
@@ -193,7 +193,7 @@ export function WarrantyPage({ active, products, onRefresh, showToast }: Props) 
         <button type="button" className="secondary-button" disabled={saving} onClick={() => void saveDetails()}>Lưu thông tin theo dõi</button>
       </div>
       <div className="warranty-timeline"><h3>Lịch sử xử lý</h3>{[...(selected.events ?? [])].sort((a, b) => a.at.localeCompare(b.at)).map(event => <div key={event.id}><Package size={15} /><span><strong>{statusNames[event.status]}</strong>{event.note && <small>{event.note}</small>}</span><time>{dateTime(event.at)}</time></div>)}</div>
-      {!closed.includes(selected.status) && <div className="warranty-update"><label>Nơi bảo hành<input maxLength={120} value={partner} onChange={event => setPartner(event.target.value)} placeholder="Tên hãng hoặc đơn vị xử lý" /></label><label>Ghi chú lần cập nhật<textarea maxLength={500} value={note} onChange={event => setNote(event.target.value)} placeholder="Kết quả kiểm tra, mã vận đơn, tình trạng sau sửa..." /></label><div className="warranty-next"><span>Cập nhật trạng thái:</span>{selected.status === 'received' && <button disabled={saving} onClick={() => void updateStatus('sent')}>Đã gửi bảo hành</button>}{(selected.status === 'received' || selected.status === 'sent') && <button disabled={saving} onClick={() => void updateStatus('ready')}>Đã bảo hành xong</button>}{selected.status === 'ready' && <button disabled={saving} onClick={() => void updateStatus(selected.source === 'customer' ? 'returned_to_customer' : 'restocked')}>{selected.source === 'customer' ? 'Đã trả khách' : 'Nhập lại kho'}</button>}<button className="danger" disabled={saving} onClick={() => void updateStatus('discarded')}>Bỏ đi</button></div><p><AlertTriangle size={14} />Hàng của khách không cộng kho và không hoàn tiền. Hàng lỗi trong kho chỉ cộng lại khi chọn “Nhập lại kho”.</p></div>}
+      {!closed.has(selected.status) && <div className="warranty-update"><label>Nơi bảo hành<input maxLength={120} value={partner} onChange={event => setPartner(event.target.value)} placeholder="Tên hãng hoặc đơn vị xử lý" /></label><label>Ghi chú lần cập nhật<textarea maxLength={500} value={note} onChange={event => setNote(event.target.value)} placeholder="Kết quả kiểm tra, mã vận đơn, tình trạng sau sửa..." /></label><div className="warranty-next"><span>Cập nhật trạng thái:</span>{selected.status === 'received' && <button disabled={saving} onClick={() => void updateStatus('sent')}>Đã gửi bảo hành</button>}{(selected.status === 'received' || selected.status === 'sent') && <button disabled={saving} onClick={() => void updateStatus('ready')}>Đã bảo hành xong</button>}{selected.status === 'ready' && <button disabled={saving} onClick={() => void updateStatus(selected.source === 'customer' ? 'returned_to_customer' : 'restocked')}>{selected.source === 'customer' ? 'Đã trả khách' : 'Nhập lại kho'}</button>}<button className="danger" disabled={saving} onClick={() => void updateStatus('discarded')}>Bỏ đi</button></div><p><AlertTriangle size={14} />Hàng của khách không cộng kho và không hoàn tiền. Hàng lỗi trong kho chỉ cộng lại khi chọn “Nhập lại kho”.</p></div>}
       <div className="modal-footer"><button className="secondary-button" onClick={() => setSelectedId(null)}>Đóng</button></div>
     </div></div>}
   </section>

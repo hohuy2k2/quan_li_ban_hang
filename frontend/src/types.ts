@@ -69,6 +69,32 @@ export interface Sale {
   returns: SaleReturn[]
 }
 
+export interface OnlineOrderItem {
+  id: number
+  productId: number
+  productCode: string
+  productName: string
+  unitPrice: number
+  quantity: number
+  lineTotal: number
+}
+
+export interface OnlineOrder {
+  id: number
+  number: string
+  customerName: string
+  customerPhone: string
+  fulfillment: 'pickup' | 'delivery'
+  address: string
+  note: string
+  status: 'pending' | 'confirmed' | 'cancelled'
+  createdAt: string
+  processedAt: string | null
+  saleId: number | null
+  total: number
+  items: OnlineOrderItem[]
+}
+
 export type ReturnDisposition = 'restock' | 'warranty' | 'discard'
 
 export interface SaleReturnItem {

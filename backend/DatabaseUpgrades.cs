@@ -113,6 +113,29 @@ public static class DatabaseUpgrades
             """);
         AddWarrantyColumn(db, "ExpectedReturnOn");
 
+        // Đơn website được thêm vào DB cũ mà không cần xoá dữ liệu đang có.
+        db.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "OnlineOrders" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_OnlineOrders" PRIMARY KEY AUTOINCREMENT,
+                "Number" TEXT NOT NULL, "CustomerName" TEXT NOT NULL,
+                "CustomerPhone" TEXT NOT NULL, "Fulfillment" TEXT NOT NULL,
+                "Address" TEXT NOT NULL, "Note" TEXT NOT NULL,
+                "Status" TEXT NOT NULL, "CreatedAt" TEXT NOT NULL,
+                "ProcessedAt" TEXT NULL, "SaleId" INTEGER NULL, "Total" INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS "OnlineOrderItems" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_OnlineOrderItems" PRIMARY KEY AUTOINCREMENT,
+                "OnlineOrderId" INTEGER NOT NULL, "ProductId" INTEGER NOT NULL,
+                "ProductCode" TEXT NOT NULL, "ProductName" TEXT NOT NULL,
+                "UnitPrice" INTEGER NOT NULL, "Quantity" INTEGER NOT NULL,
+                "LineTotal" INTEGER NOT NULL,
+                CONSTRAINT "FK_OnlineOrderItems_OnlineOrders_OnlineOrderId"
+                    FOREIGN KEY ("OnlineOrderId") REFERENCES "OnlineOrders" ("Id") ON DELETE CASCADE
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_OnlineOrders_Number" ON "OnlineOrders" ("Number");
+            CREATE INDEX IF NOT EXISTS "IX_OnlineOrderItems_OnlineOrderId" ON "OnlineOrderItems" ("OnlineOrderId");
+            """);
+
         // Existing warranty returns become visible in the new warranty page.
         db.Database.ExecuteSqlRaw("""
             INSERT INTO "WarrantyCases"
