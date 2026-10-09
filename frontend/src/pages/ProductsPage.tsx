@@ -19,7 +19,7 @@ type Props = {
 }
 
 const blankProduct = (code = ''): ProductInput => ({
-  code, name: '', brand: '', category: '', purchasePrice: 0,
+  code, name: '', brand: '', category: '', unit: 'cái', purchasePrice: 0,
   purchasePriceIncludesTax: false, salePrice: 0, quantity: 0, lowStockThreshold: 5,
   imageUrl: '', specifications: {},
 })
@@ -65,7 +65,7 @@ export function ProductsPage({ active, products, summary, onlyLowStock, onToggle
   function openEdit(product: Product) {
     setEditing(product)
     setInitialForm({
-      code: product.code, name: product.name, brand: product.brand, category: product.category,
+      code: product.code, name: product.name, brand: product.brand, category: product.category, unit: product.unit || 'cái',
       purchasePrice: product.purchasePrice, purchasePriceIncludesTax: product.purchasePriceIncludesTax,
       salePrice: product.salePrice, quantity: product.quantity, lowStockThreshold: product.lowStockThreshold,
       imageUrl: product.imageUrl, specifications: readSpecifications(product.specificationsJson),

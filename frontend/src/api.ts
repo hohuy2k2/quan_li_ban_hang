@@ -89,6 +89,14 @@ export const api = {
     if (!response.ok) throw new Error('Không xuất được tệp Excel công nợ.')
     return response.blob()
   },
+  customerStatement: async (partyId: number, year: number) => {
+    const response = await fetch(`/api/parties/${partyId}/statement.xlsx?year=${year}`)
+    if (!response.ok) {
+      const error = await response.json().catch(() => null) as { message?: string } | null
+      throw new Error(error?.message || 'Không xuất được bảng công nợ của khách.')
+    }
+    return response.blob()
+  },
   createAccount: (data: AccountDetails & { password: string }) =>
     request<Account>('/accounts', { method: 'POST', body: JSON.stringify(data) }),
   updateAccount: (id: number, data: AccountDetails) =>

@@ -319,6 +319,7 @@ app.MapPost("/api/sales", async (InventoryDb db, SaleInput input) =>
             ProductId = product.Id,
             ProductCode = product.Code,
             ProductName = product.Name,
+            Unit = product.Unit,
             UnitPrice = product.SalePrice,
             DiscountPerUnit = line.DiscountPerUnit,
             Quantity = line.Quantity,
@@ -332,6 +333,7 @@ app.MapPost("/api/sales", async (InventoryDb db, SaleInput input) =>
     if (paid > sale.Total) return Results.BadRequest(new { message = "Số tiền đã trả vượt tổng hoá đơn." });
     if (paid < sale.Total && party is null)
         return Results.BadRequest(new { message = "Bán chịu cần chọn hoặc nhập thông tin khách hàng." });
+    sale.PaidAtSale = paid;
     db.Sales.Add(sale);
     await db.SaveChangesAsync();
     if (paid < sale.Total)
@@ -469,6 +471,8 @@ static string? ValidateProduct(ProductInput input)
         return "Tên sản phẩm cần có từ 1 đến 160 ký tự.";
     if (input.Brand is null || input.Category is null || input.Brand.Length > 80 || input.Category.Length > 80)
         return "Hãng hoặc loại sản phẩm quá dài.";
+    if (input.Unit is null || string.IsNullOrWhiteSpace(input.Unit) || input.Unit.Trim().Length > 20)
+        return "Đơn vị tính cần có từ 1 đến 20 ký tự.";
     if (input.PurchasePrice < 0 || input.SalePrice < 0 || input.Quantity < 0 || input.LowStockThreshold < 0)
         return "Giá và số lượng không được âm.";
     if (!string.IsNullOrEmpty(input.ImageUrl) &&
@@ -487,6 +491,7 @@ static void Apply(Product product, ProductInput input)
     product.Name = input.Name.Trim();
     product.Brand = input.Brand.Trim();
     product.Category = input.Category.Trim();
+    product.Unit = input.Unit!.Trim();
     product.PurchasePrice = input.PurchasePrice;
     product.PurchasePriceIncludesTax = input.PurchasePriceIncludesTax;
     product.SalePrice = input.SalePrice;
@@ -511,7 +516,7 @@ static string SearchKey(string value)
 
 static object Snapshot(Product p) => new
 {
-    p.Code, p.Name, p.Brand, p.Category, p.PurchasePrice,
+    p.Code, p.Name, p.Brand, p.Category, p.Unit, p.PurchasePrice,
     p.PurchasePriceIncludesTax, p.SalePrice, p.Quantity, p.LowStockThreshold,
     p.ImageUrl, p.SpecificationsJson
 };

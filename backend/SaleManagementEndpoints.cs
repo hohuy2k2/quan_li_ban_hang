@@ -126,6 +126,7 @@ public static class SaleManagementEndpoints
                 ProductId = line.ProductId,
                 ProductCode = original?.ProductCode ?? product.Code,
                 ProductName = original?.ProductName ?? product.Name,
+                Unit = original?.Unit ?? product.Unit,
                 UnitPrice = unitPrice,
                 DiscountPerUnit = line.DiscountPerUnit,
                 Quantity = line.Quantity,
@@ -151,6 +152,11 @@ public static class SaleManagementEndpoints
                 return Results.Conflict(new { message = "Tổng hoá đơn mới nhỏ hơn phần công nợ đã được thanh toán." });
             debt.Principal = nextPrincipal;
             debt.PartyId = party.Id;
+        }
+        else
+        {
+            // Hoá đơn đã trả đủ vẫn phải cân bằng sau khi sửa giá/số lượng.
+            sale.PaidAtSale = sale.Total;
         }
         if (party is not null)
         {

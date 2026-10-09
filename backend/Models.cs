@@ -9,6 +9,7 @@ public sealed class Product
     public string Name { get; set; } = "";
     public string Brand { get; set; } = "";
     public string Category { get; set; } = "";
+    public string Unit { get; set; } = "cái";
     public string SearchText { get; set; } = "";
     public long PurchasePrice { get; set; }
     public bool PurchasePriceIncludesTax { get; set; }
@@ -80,6 +81,8 @@ public sealed class Sale
     public int? PartyId { get; set; }
     public DateTime SoldAt { get; set; }
     public long Total { get; set; }
+    // null chỉ dành cho hoá đơn cũ, trước khi phần mềm lưu số đã thu lúc bán.
+    public long? PaidAtSale { get; set; }
     public bool IsDeleted { get; set; }
     public DateTime? DeletedAt { get; set; }
     public List<SaleItem> Items { get; set; } = [];
@@ -132,6 +135,7 @@ public sealed class SaleItem
     public int ProductId { get; set; }
     public string ProductCode { get; set; } = "";
     public string ProductName { get; set; } = "";
+    public string Unit { get; set; } = "cái";
     public long UnitPrice { get; set; }
     public long DiscountPerUnit { get; set; }
     public int Quantity { get; set; }
@@ -319,7 +323,8 @@ public sealed record ProductInput(
     int Quantity,
     int LowStockThreshold,
     string? ImageUrl = null,
-    Dictionary<string, string>? Specifications = null);
+    Dictionary<string, string>? Specifications = null,
+    string? Unit = "cái");
 
 public sealed record StockDocumentLineInput(int ProductId, int Quantity, long? PurchasePrice, bool? PurchasePriceIncludesTax);
 public sealed record StockDocumentInput(string Kind, string DocumentDate, string? Supplier, string? Reason, List<StockDocumentLineInput> Items, int? SupplierId = null, long? PaidAmount = null, string? DueDate = null);

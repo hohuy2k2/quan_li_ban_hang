@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
 $appPath = Join-Path $projectRoot 'release\backend.exe'
 $address = 'http://127.0.0.1:5000'

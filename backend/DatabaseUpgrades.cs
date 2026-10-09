@@ -114,6 +114,9 @@ public static class DatabaseUpgrades
         AddWarrantyColumn(db, "ExpectedReturnOn");
         AddColumnIfMissing(db, "Products", "ImageUrl", "TEXT NOT NULL DEFAULT ''");
         AddColumnIfMissing(db, "Products", "SpecificationsJson", "TEXT NOT NULL DEFAULT '{}'");
+        AddColumnIfMissing(db, "Products", "Unit", "TEXT NOT NULL DEFAULT 'cái'");
+        AddColumnIfMissing(db, "SaleItems", "Unit", "TEXT NOT NULL DEFAULT 'cái'");
+        AddColumnIfMissing(db, "Sales", "PaidAtSale", "INTEGER NULL");
 
         // Đơn website được thêm vào DB cũ mà không cần xoá dữ liệu đang có.
         db.Database.ExecuteSqlRaw("""

@@ -4,6 +4,7 @@ export interface Product {
   name: string
   brand: string
   category: string
+  unit: string
   purchasePrice: number
   purchasePriceIncludesTax: boolean
   salePrice: number
@@ -83,6 +84,7 @@ export interface SaleItem {
   productId: number
   productCode: string
   productName: string
+  unit: string
   unitPrice: number
   discountPerUnit: number
   quantity: number

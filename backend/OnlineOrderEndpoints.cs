@@ -127,7 +127,7 @@ public static class OnlineOrderEndpoints
         {
             Number = $"HD-{DateTime.Now:yyMMdd}-{Guid.NewGuid().ToString("N")[..6].ToUpperInvariant()}",
             CustomerName = order.CustomerName, CustomerPhone = order.CustomerPhone,
-            SoldAt = now, Total = order.Total
+            SoldAt = now, Total = order.Total, PaidAtSale = 0
         };
         var party = await DebtEndpoints.ResolveParty(db, "customer", null, order.CustomerName, order.CustomerPhone);
         if (party is not null) sale.PartyId = party.Id;
@@ -143,6 +143,7 @@ public static class OnlineOrderEndpoints
             {
                 ProductId = line.ProductId, ProductCode = line.ProductCode,
                 ProductName = line.ProductName, UnitPrice = line.UnitPrice,
+                Unit = (await db.Products.AsNoTracking().FirstAsync(p => p.Id == line.ProductId)).Unit,
                 Quantity = line.Quantity, LineTotal = line.LineTotal
             });
             db.StockMovements.Add(new StockMovement

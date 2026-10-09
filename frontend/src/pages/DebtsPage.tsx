@@ -10,7 +10,7 @@ type Props = { active: boolean; focusPartyId: number | null; onClearFocus: () =>
 const today = () => new Date().toLocaleDateString('sv-SE')
 const blankSupplier = (): PartyInput => ({ kind: 'supplier', name: '', phone: '', email: '', address: '', note: '' })
 
-/** Công nợ từng chứng từ, thanh toán từng lần và xuất toàn bộ sổ ra Excel. */
+/** Công nợ từng chứng từ; xuất sổ nội bộ hoặc bảng chi tiết gửi riêng từng khách. */
 export function DebtsPage({ active, focusPartyId, onClearFocus, showToast }: Props) {
   const [kind, setKind] = useState<PartyKind>('customer')
   const [debts, setDebts] = useState<Debt[]>([])
@@ -26,8 +26,10 @@ export function DebtsPage({ active, focusPartyId, onClearFocus, showToast }: Pro
   const [supplierId, setSupplierId] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const [loadKey, setLoadKey] = useState(0)
+  const [statementPartyId, setStatementPartyId] = useState(0)
+  const [statementYear, setStatementYear] = useState(new Date().getFullYear())
 
-  useEffect(() => { if (focusPartyId) setKind('customer') }, [focusPartyId])
+  useEffect(() => { if (focusPartyId) { setKind('customer'); setStatementPartyId(focusPartyId) } }, [focusPartyId])
 
   useEffect(() => {
     if (!active) return
@@ -97,10 +99,24 @@ export function DebtsPage({ active, focusPartyId, onClearFocus, showToast }: Pro
     } catch (error) { showToast(error instanceof Error ? error.message : 'Không xuất được Excel.', 'error') }
   }
 
+  async function exportCustomerStatement() {
+    if (!statementPartyId) { showToast('Hãy chọn khách hàng cần xuất bảng công nợ.', 'error'); return }
+    try {
+      const file = await api.customerStatement(statementPartyId, statementYear)
+      const url = URL.createObjectURL(file)
+      const link = document.createElement('a')
+      link.href = url; link.download = `cong-no-khach-${statementPartyId}-${statementYear}.xlsx`
+      document.body.appendChild(link); link.click(); link.remove()
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+      showToast('Đã xuất bảng công nợ chi tiết cho khách hàng.')
+    } catch (error) { showToast(error instanceof Error ? error.message : 'Không xuất được bảng công nợ.', 'error') }
+  }
+
   return <section className="page-content" style={{ display: active ? undefined : 'none' }}>
     <div className="page-heading"><div><div className="eyebrow">THEO DÕI THANH TOÁN</div><h1>Công nợ</h1><p>Ghi nhận từng khoản còn phải thu hoặc phải trả và các lần thanh toán.</p></div>
-      <div className="debt-actions"><button className="secondary-button" onClick={() => void exportExcel()}><Download size={16} />Xuất Excel</button><button className="primary-button" onClick={() => { setOpeningForm({ partyId: 0, amount: 0, dueDate: '', note: '' }); setOpening(true) }}><Plus size={16} />Nợ đầu kỳ</button></div></div>
+      <div className="debt-actions"><button className="secondary-button" onClick={() => void exportExcel()}><Download size={16} />Xuất sổ tổng hợp</button><button className="primary-button" onClick={() => { setOpeningForm({ partyId: 0, amount: 0, dueDate: '', note: '' }); setOpening(true) }}><Plus size={16} />Nợ đầu kỳ</button></div></div>
     <div className="debt-tabs"><button className={kind === 'customer' ? 'selected' : ''} onClick={() => { setKind('customer'); setExpanded(null) }}>Khách hàng phải trả</button><button className={kind === 'supplier' ? 'selected' : ''} onClick={() => { onClearFocus(); setKind('supplier'); setExpanded(null) }}>Cần trả nhà cung cấp</button>{focusPartyId && <button onClick={onClearFocus}>Bỏ lọc khách hàng ×</button>}</div>
+    {kind === 'customer' && <div className="panel statement-export"><strong>Bảng công nợ gửi khách</strong><select aria-label="Khách hàng cần xuất" value={statementPartyId} onChange={event => setStatementPartyId(Number(event.target.value))}><option value={0}>Chọn khách hàng</option>{parties.map(p => <option key={p.id} value={p.id}>{p.name}{p.phone ? ` · ${p.phone}` : ''}</option>)}</select><label>Năm <input aria-label="Năm báo cáo" type="number" min={2000} max={2100} value={statementYear} onChange={event => setStatementYear(Number(event.target.value))} /></label><button className="secondary-button" onClick={() => void exportCustomerStatement()} disabled={!statementPartyId || statementYear < 2000 || statementYear > 2100}><Download size={16} />Xuất chi tiết</button></div>}
     <div className="debt-summary"><div><span>Tổng còn nợ</span><strong>{money(outstanding)}</strong></div><div><span>Khoản chưa tất toán</span><strong>{debts.filter(d => d.balance > 0 && (!focusPartyId || d.partyId === focusPartyId)).length}</strong></div></div>
     {kind === 'supplier' && <div className="panel supplier-panel"><div className="supplier-heading"><strong>Nhà cung cấp</strong><button className="secondary-button" onClick={() => { setSupplierId(null); setSupplierForm(blankSupplier()) }}><Plus size={15} />Thêm nhà cung cấp</button></div>
       <div className="supplier-list">{parties.map(p => <div key={p.id}><span><strong>{p.name}</strong> · {p.phone || 'Chưa có số điện thoại'} · Còn nợ {money(p.balance)}</span><button className="icon-button" onClick={() => { setSupplierId(p.id); setSupplierForm({ kind: 'supplier', name: p.name, phone: p.phone, email: p.email, address: p.address, note: p.note }) }} aria-label={`Sửa ${p.name}`}><Pencil size={15} /></button></div>)}</div></div>}

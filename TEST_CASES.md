@@ -102,7 +102,10 @@ Nếu một trường hợp lỗi, hãy ghi lại **ID**, bước đang làm, k�
 | D04 | Ghi thanh toán 100.000 đ cho khoản D03, rồi thử ghi 60.000 đ. | Lần đầu còn nợ 50.000 đ, lịch sử lưu ngày/ghi chú; lần sau bị chặn vì vượt số dư. | ☐ |
 | D05 | Nhập 4 món giá nhập 50.000 đ/món, đã trả 20.000 đ cho một nhà cung cấp. | Công nợ nhà cung cấp là 180.000 đ; ghi trả một phần cập nhật số dư. | ☐ |
 | D06 | Tạo **Nợ đầu kỳ** cho khách và nhà cung cấp, có hạn trả. | Hai khoản hiện đúng loại, số tiền, hạn trả; không làm thay đổi tồn kho/doanh thu. | ☐ |
-| D07 | Bấm **Xuất Excel** ở từng loại công nợ và mở tệp trong Excel. | Tệp `.xlsx` có sheet **Cong no** và **Thanh toan**, số dư khớp màn hình, chữ tiếng Việt đọc được. | ☐ |
+| D07 | Bấm **Xuất sổ tổng hợp** ở từng loại công nợ và mở tệp trong Excel. | Tệp `.xlsx` có sheet **Cong no** và **Thanh toan**, số dư khớp màn hình, chữ tiếng Việt đọc được. | ☐ |
+| D07a | Thêm sản phẩm có đơn vị `bộ`, bán cho khách đã lưu với giảm giá và trả một phần; ghi thêm một lần thanh toán. Chọn khách và năm ở mục Công nợ, bấm **Xuất chi tiết**. | Sheet tháng có tên hàng, ĐVT `bộ`, số lượng, đơn giá sau giảm, mã hoá đơn, tiền đã trả và số dư cuối tháng khớp Công nợ. | ☐ |
+| D07b | Lập thêm nợ đầu kỳ, bán ở tháng khác rồi xuất chi tiết cùng khách/năm; thử một năm không có giao dịch. | Mỗi tháng phát sinh có sheet riêng và chuyển đúng số dư đầu tháng; năm trống vẫn có sheet Tháng 12 ghi số dư chuyển tiếp. | ☐ |
+| D07c | Trả hàng một phần của hoá đơn còn nợ, sau đó xuất lại chi tiết. | Dòng trả hàng chỉ giảm phần nợ được cấn trừ; phần hoàn tiền mặt được ghi rõ và nợ cuối kỳ khớp màn hình. | ☐ |
 | D08 | Xác nhận đơn online chưa thu tiền, rồi xem Công nợ khách. | Hoá đơn và khoản chưa thanh toán được tạo; chỉ giảm công nợ sau khi ghi thanh toán. | ☐ |
 | D09 | Mở dữ liệu cửa hàng cũ sau nâng cấp. | Hoá đơn/phiếu nhập cũ vẫn còn trong lịch sử, không tự tạo công nợ; có thể nhập nợ cũ bằng **Nợ đầu kỳ**. | ☐ |
 | D10 | Thử xoá hoá đơn đã có lịch sử trả công nợ. | Hệ thống từ chối xoá để giữ đối chiếu thanh toán. | ☐ |

@@ -131,6 +131,23 @@ public static class DebtEndpoints
             return Results.File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 $"cong-no-{DateTime.Now:yyyy-MM-dd}.xlsx");
         });
+        // Sổ chi tiết riêng cho khách: từng hàng bán, tiền thu và số dư theo tháng.
+        app.MapGet("/api/parties/{id:int}/statement.xlsx", async (InventoryDb db, int id, int? year) =>
+        {
+            var selectedYear = year ?? DateTime.Today.Year;
+            if (selectedYear is < 2000 or > 2100)
+                return Results.BadRequest(new { message = "Năm báo cáo không hợp lệ." });
+            var party = await db.BusinessParties.AsNoTracking().FirstOrDefaultAsync(p => p.Id == id && p.Kind == "customer");
+            if (party is null) return Results.NotFound(new { message = "Không tìm thấy khách hàng." });
+            var sales = await db.Sales.AsNoTracking().Include(s => s.Items)
+                .Include(s => s.Returns).ThenInclude(r => r.Items).AsSplitQuery()
+                .Where(s => !s.IsDeleted && s.PartyId == id).ToListAsync();
+            var debts = await db.DebtAccounts.AsNoTracking().Include(d => d.Payments)
+                .Where(d => d.PartyId == id).ToListAsync();
+            var bytes = CustomerStatementExcel.Export(party, selectedYear, sales, debts);
+            return Results.File(bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                $"cong-no-khach-{id}-{selectedYear}.xlsx");
+        });
     }
 
     /** Ghép giao dịch với hồ sơ có sẵn hoặc lập hồ sơ khi có tên/số điện thoại. */

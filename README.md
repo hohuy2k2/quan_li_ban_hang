@@ -8,7 +8,7 @@
 - Trang quản lý yêu cầu tài khoản admin. Sản phẩm có ảnh riêng cho website và các thông số tuỳ chọn như công suất, kích thước; ảnh không hiển thị trong bảng quản lý. Trang **Doanh thu** thống kê theo ngày, tháng và khoảng thời gian chọn, trừ tiền hoàn hàng theo ngày hoàn.
 - Trang **Tài khoản** cho admin sửa hồ sơ, đổi mật khẩu, tạo tài khoản, sửa quyền, khóa/mở khóa và đặt lại mật khẩu cho người khác. Khóa tài khoản giữ nguyên lịch sử đơn hàng. Mật khẩu mới cần ít nhất 8 ký tự.
 - Trang **Khách hàng** lưu tên, điện thoại, email, địa chỉ, ghi chú, lịch sử hoá đơn và số dư công nợ. Khách đăng ký trên website được đưa vào danh bạ; hoá đơn cũ có số điện thoại được nối với hồ sơ để xem lịch sử mua.
-- Trang **Công nợ** tách nợ khách hàng và nợ nhà cung cấp theo từng hoá đơn/phiếu nhập. Khi bán hoặc nhập hàng, chọn **Trả một phần / ghi nợ** và nhập số đã trả; phần còn lại thành công nợ. Có thể ghi nợ đầu kỳ, hạn trả và nhiều lần thanh toán; hệ thống chặn trả vượt số dư. Đơn online sau khi xác nhận được ghi là chưa thanh toán, vì bước xác nhận chưa thu tiền. Nút **Xuất Excel** tải tệp `.xlsx` có hai sheet: công nợ và lịch sử thanh toán.
+- Trang **Công nợ** tách nợ khách hàng và nợ nhà cung cấp theo từng hoá đơn/phiếu nhập. Khi bán hoặc nhập hàng, chọn **Trả một phần / ghi nợ** và nhập số đã trả; phần còn lại thành công nợ. Có thể ghi nợ đầu kỳ, hạn trả và nhiều lần thanh toán; hệ thống chặn trả vượt số dư. Đơn online sau khi xác nhận được ghi là chưa thanh toán, vì bước xác nhận chưa thu tiền. **Xuất sổ tổng hợp** tải tệp `.xlsx` hai sheet để đối chiếu nội bộ. Ở thẻ khách hàng, chọn khách và năm rồi bấm **Xuất chi tiết** để tải bảng gửi khách: mỗi tháng có một sheet, dòng hàng theo hoá đơn, đơn vị tính, số lượng, đơn giá sau giảm, tiền đã trả, hàng trả giảm nợ và nợ cuối tháng. Đơn vị tính được nhập trong biểu mẫu sản phẩm; hoá đơn cũ dùng mặc định `cái`.
 - Website báo riêng email chưa đăng ký, sai mật khẩu và tài khoản bị khóa khi đăng nhập. Khách có thể chọn **Quên mật khẩu** để nhận mã qua email đã đăng ký rồi đặt mật khẩu mới.
 - Giỏ hàng website lưu mã sản phẩm và số lượng trên trình duyệt; tải lại trang vẫn còn giỏ, còn giá bán được lấy lại từ dữ liệu hiện tại. Nút mặt trăng/mặt trời chuyển sáng/tối và ghi nhớ lựa chọn trên trình duyệt.
 
@@ -36,6 +36,8 @@ Khi đã ghi nhận hàng trả, hoá đơn được giữ nguyên để đối 
 
 Các hoá đơn và phiếu nhập có trước khi thêm công nợ được coi là đã thanh toán; ứng dụng không tự phát sinh nợ hồi tố. Nếu đang có nợ cũ, thêm bằng **Nợ đầu kỳ**. Hoá đơn đã có lần trả công nợ không thể xoá để giữ lịch sử đối chiếu. Khi trả hàng của hoá đơn còn nợ, phần giá trị trả sẽ giảm số nợ; người bán cần đối chiếu số tiền đã thực thu trước khi hoàn tiền mặt.
 
+Với hoá đơn ghi nợ lập trước bản cập nhật này, phần mềm chưa từng lưu riêng số đã thu lúc bán. Bảng chi tiết sẽ ghi rõ **ước tính từ dữ liệu cũ** tại dòng đó; nên đối chiếu chứng từ gốc trước khi gửi khách nếu hoá đơn cũ đã có trả hàng.
+
 ## Cấu trúc giao diện
 
 - `frontend/src/App.tsx`: khung ứng dụng, điều hướng và tải dữ liệu chung.
@@ -60,7 +62,7 @@ cd ..
 dotnet restore backend\backend.csproj
 ```
 
-`npm install` cài các thư viện được khai báo trong `frontend/package.json`. `dotnet restore` tải gói SQLite và MailKit cho backend. Mã nguồn không tự cài thư viện lúc chạy ứng dụng bán hàng.
+`npm install` cài các thư viện được khai báo trong `frontend/package.json`. `dotnet restore` tải gói SQLite, MailKit và ClosedXML (xuất bảng công nợ chi tiết) cho backend. Mã nguồn không tự cài thư viện lúc chạy ứng dụng bán hàng.
 
 ## Cấu hình email khôi phục mật khẩu
 
@@ -113,10 +115,11 @@ Mở `http://127.0.0.1:5174/store/`. Cần giữ backend đang chạy. Website c
 Sau khi cài thư viện, chạy một lần khi phát hành phiên bản mới:
 
 ```powershell
-.\scripts\Build-Release.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Build-Release.ps1
 ```
 
 Thư mục `release` chứa ứng dụng đã đóng gói. Sau đó có thể nhấp đúp `scripts\Start-Local.cmd`: chương trình sẽ khởi động ứng dụng và mở `http://127.0.0.1:5000` trong trình duyệt. Người bán hàng không phải chạy `npm run build`.
+Tham số `ExecutionPolicy Bypass` ở lệnh trên chỉ áp dụng cho lần chạy PowerShell đó, không thay đổi chính sách của máy.
 
 Sau khi đóng gói, website khách hàng chạy trên cùng máy tại `http://127.0.0.1:5000/store/`.
 
