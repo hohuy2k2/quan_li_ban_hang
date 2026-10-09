@@ -155,6 +155,72 @@ public static class DatabaseUpgrades
         AddColumnIfMissing(db, "AppUsers", "ResetCodeRequestedAt", "TEXT NULL");
         AddColumnIfMissing(db, "AppUsers", "ResetCodeAttempts", "INTEGER NOT NULL DEFAULT 0");
 
+        // Hồ sơ CRM và công nợ được thêm vào DB đang dùng, không thay đổi các hoá đơn cũ.
+        AddColumnIfMissing(db, "Sales", "PartyId", "INTEGER NULL");
+        AddColumnIfMissing(db, "StockDocuments", "PartyId", "INTEGER NULL");
+        db.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "BusinessParties" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_BusinessParties" PRIMARY KEY AUTOINCREMENT,
+                "Kind" TEXT NOT NULL, "Name" TEXT NOT NULL, "Phone" TEXT NOT NULL,
+                "Email" TEXT NOT NULL, "Address" TEXT NOT NULL, "Note" TEXT NOT NULL,
+                "CreatedAt" TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS "IX_BusinessParties_Kind_Phone" ON "BusinessParties" ("Kind", "Phone");
+            CREATE TABLE IF NOT EXISTS "DebtAccounts" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_DebtAccounts" PRIMARY KEY AUTOINCREMENT,
+                "PartyId" INTEGER NOT NULL, "SourceType" TEXT NOT NULL, "SourceId" INTEGER NULL,
+                "Reference" TEXT NOT NULL, "Principal" INTEGER NOT NULL,
+                "DueDate" TEXT NOT NULL, "Note" TEXT NOT NULL, "CreatedAt" TEXT NOT NULL,
+                CONSTRAINT "FK_DebtAccounts_BusinessParties_PartyId"
+                    FOREIGN KEY ("PartyId") REFERENCES "BusinessParties" ("Id") ON DELETE RESTRICT
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_DebtAccounts_SourceType_SourceId" ON "DebtAccounts" ("SourceType", "SourceId");
+            CREATE INDEX IF NOT EXISTS "IX_DebtAccounts_PartyId" ON "DebtAccounts" ("PartyId");
+            CREATE TABLE IF NOT EXISTS "DebtPayments" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_DebtPayments" PRIMARY KEY AUTOINCREMENT,
+                "DebtAccountId" INTEGER NOT NULL, "Amount" INTEGER NOT NULL,
+                "PaidAt" TEXT NOT NULL, "Note" TEXT NOT NULL,
+                CONSTRAINT "FK_DebtPayments_DebtAccounts_DebtAccountId"
+                    FOREIGN KEY ("DebtAccountId") REFERENCES "DebtAccounts" ("Id") ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS "IX_DebtPayments_DebtAccountId" ON "DebtPayments" ("DebtAccountId");
+            """);
+        AddColumnIfMissing(db, "BusinessParties", "AppUserId", "INTEGER NULL");
+        db.Database.ExecuteSqlRaw("CREATE INDEX IF NOT EXISTS \"IX_BusinessParties_AppUserId\" ON \"BusinessParties\" (\"AppUserId\");");
+        // Các hoá đơn/phiếu nhập cũ chỉ vào danh bạ để tra lịch sử, không phát sinh nợ hồi tố.
+        db.Database.ExecuteSqlRaw("""
+            INSERT INTO "BusinessParties" ("Kind", "Name", "Phone", "Email", "Address", "Note", "CreatedAt")
+            SELECT 'customer', COALESCE(NULLIF(MAX(TRIM(s."CustomerName")), ''), s."CustomerPhone"),
+                   TRIM(s."CustomerPhone"), '', '', '', MIN(s."SoldAt")
+            FROM "Sales" s WHERE TRIM(s."CustomerPhone") <> ''
+            GROUP BY TRIM(s."CustomerPhone")
+            HAVING NOT EXISTS (SELECT 1 FROM "BusinessParties" p
+                WHERE p."Kind" = 'customer' AND p."Phone" = TRIM(s."CustomerPhone"));
+            INSERT INTO "BusinessParties" ("Kind", "Name", "Phone", "Email", "Address", "Note", "CreatedAt")
+            SELECT 'supplier', TRIM(d."Supplier"), '', '', '', '', MIN(d."CreatedAt")
+            FROM "StockDocuments" d WHERE TRIM(d."Supplier") <> ''
+            GROUP BY TRIM(d."Supplier")
+            HAVING NOT EXISTS (SELECT 1 FROM "BusinessParties" p
+                WHERE p."Kind" = 'supplier' AND p."Name" = TRIM(d."Supplier"));
+            UPDATE "Sales" SET "PartyId" = (SELECT p."Id" FROM "BusinessParties" p
+                WHERE p."Kind" = 'customer' AND p."Phone" = TRIM("Sales"."CustomerPhone") LIMIT 1)
+            WHERE "PartyId" IS NULL AND TRIM("CustomerPhone") <> '';
+            UPDATE "StockDocuments" SET "PartyId" = (SELECT p."Id" FROM "BusinessParties" p
+                WHERE p."Kind" = 'supplier' AND p."Name" = TRIM("StockDocuments"."Supplier") LIMIT 1)
+            WHERE "PartyId" IS NULL AND TRIM("Supplier") <> '';
+            UPDATE "BusinessParties" SET "AppUserId" = (
+                SELECT u."Id" FROM "AppUsers" u WHERE u."Role" = 'customer'
+                  AND (u."NormalizedEmail" = UPPER("BusinessParties"."Email")
+                    OR (TRIM(u."Phone") <> '' AND TRIM(u."Phone") = "BusinessParties"."Phone"))
+                ORDER BY u."Id" LIMIT 1)
+            WHERE "Kind" = 'customer' AND "AppUserId" IS NULL;
+            INSERT INTO "BusinessParties"
+                ("AppUserId", "Kind", "Name", "Phone", "Email", "Address", "Note", "CreatedAt")
+            SELECT u."Id", 'customer', u."DisplayName", u."Phone", u."Email", '', '', u."CreatedAt"
+            FROM "AppUsers" u WHERE u."Role" = 'customer'
+              AND NOT EXISTS (SELECT 1 FROM "BusinessParties" p WHERE p."AppUserId" = u."Id");
+            """);
+
         // Existing warranty returns become visible in the new warranty page.
         db.Database.ExecuteSqlRaw("""
             INSERT INTO "WarrantyCases"

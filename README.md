@@ -7,6 +7,8 @@
 - Website khách hàng ở `/store/`: xem danh mục, ảnh và thông số từng sản phẩm, mua ngay hoặc thêm giỏ. Khách đăng ký/đăng nhập trước khi đặt hàng và xem lịch sử/trạng thái đơn trong **Đơn của tôi**. Mục **Đơn online** trong phần quản lý nhận thông báo tự động, cho phép xác nhận (tạo hoá đơn, trừ kho) hoặc huỷ đơn. Khi khách mới gửi đơn, tồn kho chưa bị trừ. Chưa có thanh toán online hoặc tính phí vận chuyển.
 - Trang quản lý yêu cầu tài khoản admin. Sản phẩm có ảnh riêng cho website và các thông số tuỳ chọn như công suất, kích thước; ảnh không hiển thị trong bảng quản lý. Trang **Doanh thu** thống kê theo ngày, tháng và khoảng thời gian chọn, trừ tiền hoàn hàng theo ngày hoàn.
 - Trang **Tài khoản** cho admin sửa hồ sơ, đổi mật khẩu, tạo tài khoản, sửa quyền, khóa/mở khóa và đặt lại mật khẩu cho người khác. Khóa tài khoản giữ nguyên lịch sử đơn hàng. Mật khẩu mới cần ít nhất 8 ký tự.
+- Trang **Khách hàng** lưu tên, điện thoại, email, địa chỉ, ghi chú, lịch sử hoá đơn và số dư công nợ. Khách đăng ký trên website được đưa vào danh bạ; hoá đơn cũ có số điện thoại được nối với hồ sơ để xem lịch sử mua.
+- Trang **Công nợ** tách nợ khách hàng và nợ nhà cung cấp theo từng hoá đơn/phiếu nhập. Khi bán hoặc nhập hàng, chọn **Trả một phần / ghi nợ** và nhập số đã trả; phần còn lại thành công nợ. Có thể ghi nợ đầu kỳ, hạn trả và nhiều lần thanh toán; hệ thống chặn trả vượt số dư. Đơn online sau khi xác nhận được ghi là chưa thanh toán, vì bước xác nhận chưa thu tiền. Nút **Xuất Excel** tải tệp `.xlsx` có hai sheet: công nợ và lịch sử thanh toán.
 - Website báo riêng email chưa đăng ký, sai mật khẩu và tài khoản bị khóa khi đăng nhập. Khách có thể chọn **Quên mật khẩu** để nhận mã qua email đã đăng ký rồi đặt mật khẩu mới.
 - Giỏ hàng website lưu mã sản phẩm và số lượng trên trình duyệt; tải lại trang vẫn còn giỏ, còn giá bán được lấy lại từ dữ liệu hiện tại. Nút mặt trăng/mặt trời chuyển sáng/tối và ghi nhớ lựa chọn trên trình duyệt.
 
@@ -32,10 +34,12 @@ Mục **Có thuế / Chưa thuế** hiện chỉ ghi lại trạng thái của *
 
 Khi đã ghi nhận hàng trả, hoá đơn được giữ nguyên để đối chiếu và không thể sửa nữa. Hàng bảo hành vẫn thuộc khách hàng nên không được cộng vào tồn kho bán được. Doanh thu hôm nay là tiền bán hôm nay trừ tiền hoàn trả hôm nay.
 
+Các hoá đơn và phiếu nhập có trước khi thêm công nợ được coi là đã thanh toán; ứng dụng không tự phát sinh nợ hồi tố. Nếu đang có nợ cũ, thêm bằng **Nợ đầu kỳ**. Hoá đơn đã có lần trả công nợ không thể xoá để giữ lịch sử đối chiếu. Khi trả hàng của hoá đơn còn nợ, phần giá trị trả sẽ giảm số nợ; người bán cần đối chiếu số tiền đã thực thu trước khi hoàn tiền mặt.
+
 ## Cấu trúc giao diện
 
 - `frontend/src/App.tsx`: khung ứng dụng, điều hướng và tải dữ liệu chung.
-- `frontend/src/pages/`: các màn hình bán hàng, sản phẩm, phiếu kho, hoá đơn, đơn online, doanh thu, bảo hành và lịch sử. Mỗi màn hình giữ trạng thái của chức năng mình.
+- `frontend/src/pages/`: các màn hình bán hàng, sản phẩm, phiếu kho, hoá đơn, khách hàng, công nợ, đơn online, doanh thu, bảo hành và lịch sử. Mỗi màn hình giữ trạng thái của chức năng mình.
 - `frontend/src/components/`: biểu mẫu sản phẩm, hộp thoại in tem, chi tiết hoá đơn và bộ điều khiển phân trang dùng chung (`Pagination.tsx`).
 - `frontend/src/utils/format.ts`: định dạng tiền, ngày giờ, tìm kiếm và nội dung lịch sử.
 - `frontend/src/hooks/usePagination.ts`: tính trang hiện tại và tự quay về trang 1 khi bộ lọc thay đổi.
@@ -126,6 +130,6 @@ API quản lý nay yêu cầu quyền admin; tài khoản khách chỉ được 
 
 Tệp dữ liệu mặc định nằm tại `%LOCALAPPDATA%\QuanLyBanHang\inventory.db`; ảnh sản phẩm ở thư mục `product-images` cạnh tệp DB. Có thể đổi thư mục bằng biến môi trường `INVENTORY_DATA_DIR`. Nút **Sao lưu dữ liệu và ảnh** tải ZIP chứa `inventory.db` cùng thư mục `product-images`. Để khôi phục, đóng ứng dụng, giữ thêm một bản của dữ liệu hiện tại rồi giải nén hai thành phần này vào `%LOCALAPPDATA%\QuanLyBanHang`. Tài khoản admin và khách nằm trong DB; nếu không còn phiên đăng nhập, hãy đăng nhập lại sau khi khôi phục. Có thể giữ ZIP trong Google Drive; phần mềm chưa tự đồng bộ Drive.
 
-Trước lần chạy đầu sau khi cập nhật phần nhập kho, kiểm kê và bảo hành, hãy dùng nút **Sao lưu dữ liệu** trên bản cũ. Bản mới sẽ tự bổ sung cột giảm giá, các cột đánh dấu hoá đơn đã xoá và các bảng bảo hành, phiếu kho và trường theo dõi serial/ngày hẹn vào cơ sở dữ liệu hiện có; dữ liệu sản phẩm và hoá đơn cũ được giữ lại. Nếu đang chạy backend, dừng tiến trình đó rồi khởi động lại để nạp mã mới.
+Trước lần chạy đầu sau khi cập nhật, hãy dùng nút **Sao lưu dữ liệu** trên bản cũ. Bản mới sẽ tự bổ sung các bảng khách hàng, công nợ, thanh toán cùng các trường cần thiết vào cơ sở dữ liệu hiện có; dữ liệu sản phẩm và hoá đơn cũ được giữ lại. Nếu đang chạy backend, dừng tiến trình đó rồi khởi động lại để nạp mã mới. Nếu dùng bản `release`, chạy lại `scripts\Build-Release.ps1` trước.
 
 Mỗi món hàng cùng loại dùng chung mã vạch. Mã vạch lưu **mã sản phẩm**, không lưu giá. Khi sửa giá, hãy in lại tem giá cho hàng còn trên kệ.

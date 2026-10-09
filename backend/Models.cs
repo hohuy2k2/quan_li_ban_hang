@@ -53,6 +53,7 @@ public sealed class StockDocument
     public string Kind { get; set; } = "";
     public string DocumentDate { get; set; } = "";
     public string Supplier { get; set; } = "";
+    public int? PartyId { get; set; }
     public string Reason { get; set; } = "";
     public DateTime CreatedAt { get; set; }
     public List<StockDocumentLine> Lines { get; set; } = [];
@@ -76,12 +77,52 @@ public sealed class Sale
     public string Number { get; set; } = "";
     public string CustomerName { get; set; } = "";
     public string CustomerPhone { get; set; } = "";
+    public int? PartyId { get; set; }
     public DateTime SoldAt { get; set; }
     public long Total { get; set; }
     public bool IsDeleted { get; set; }
     public DateTime? DeletedAt { get; set; }
     public List<SaleItem> Items { get; set; } = [];
     public List<SaleReturn> Returns { get; set; } = [];
+}
+
+// Một hồ sơ dùng cho khách hàng hoặc nhà cung cấp; công nợ luôn gắn với hồ sơ này.
+public sealed class BusinessParty
+{
+    public int Id { get; set; }
+    public int? AppUserId { get; set; }
+    public string Kind { get; set; } = "customer";
+    public string Name { get; set; } = "";
+    public string Phone { get; set; } = "";
+    public string Email { get; set; } = "";
+    public string Address { get; set; } = "";
+    public string Note { get; set; } = "";
+    public DateTime CreatedAt { get; set; }
+}
+
+// Principal là số tiền còn phải thu/trả ban đầu; thanh toán lưu riêng để giữ lịch sử.
+public sealed class DebtAccount
+{
+    public int Id { get; set; }
+    public int PartyId { get; set; }
+    public BusinessParty Party { get; set; } = null!;
+    public string SourceType { get; set; } = "opening";
+    public int? SourceId { get; set; }
+    public string Reference { get; set; } = "";
+    public long Principal { get; set; }
+    public string DueDate { get; set; } = "";
+    public string Note { get; set; } = "";
+    public DateTime CreatedAt { get; set; }
+    public List<DebtPayment> Payments { get; set; } = [];
+}
+
+public sealed class DebtPayment
+{
+    public int Id { get; set; }
+    public int DebtAccountId { get; set; }
+    public long Amount { get; set; }
+    public DateTime PaidAt { get; set; }
+    public string Note { get; set; } = "";
 }
 
 public sealed class SaleItem
@@ -233,6 +274,9 @@ public sealed class InventoryDb(DbContextOptions<InventoryDb> options) : DbConte
     public DbSet<WarrantyCase> WarrantyCases => Set<WarrantyCase>();
     public DbSet<WarrantyEvent> WarrantyEvents => Set<WarrantyEvent>();
     public DbSet<WarrantyUnit> WarrantyUnits => Set<WarrantyUnit>();
+    public DbSet<BusinessParty> BusinessParties => Set<BusinessParty>();
+    public DbSet<DebtAccount> DebtAccounts => Set<DebtAccount>();
+    public DbSet<DebtPayment> DebtPayments => Set<DebtPayment>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -256,6 +300,11 @@ public sealed class InventoryDb(DbContextOptions<InventoryDb> options) : DbConte
         modelBuilder.Entity<WarrantyCase>().HasMany(w => w.Units).WithOne().HasForeignKey(u => u.WarrantyCaseId);
         modelBuilder.Entity<ProductAudit>().HasIndex(a => a.ProductId);
         modelBuilder.Entity<StockMovement>().HasIndex(m => m.ProductId);
+        modelBuilder.Entity<BusinessParty>().HasIndex(p => new { p.Kind, p.Phone });
+        modelBuilder.Entity<BusinessParty>().HasIndex(p => p.AppUserId);
+        modelBuilder.Entity<DebtAccount>().HasIndex(d => new { d.SourceType, d.SourceId }).IsUnique();
+        modelBuilder.Entity<DebtAccount>().HasOne(d => d.Party).WithMany().HasForeignKey(d => d.PartyId);
+        modelBuilder.Entity<DebtAccount>().HasMany(d => d.Payments).WithOne().HasForeignKey(p => p.DebtAccountId);
     }
 }
 
@@ -273,9 +322,9 @@ public sealed record ProductInput(
     Dictionary<string, string>? Specifications = null);
 
 public sealed record StockDocumentLineInput(int ProductId, int Quantity, long? PurchasePrice, bool? PurchasePriceIncludesTax);
-public sealed record StockDocumentInput(string Kind, string DocumentDate, string? Supplier, string? Reason, List<StockDocumentLineInput> Items);
+public sealed record StockDocumentInput(string Kind, string DocumentDate, string? Supplier, string? Reason, List<StockDocumentLineInput> Items, int? SupplierId = null, long? PaidAmount = null, string? DueDate = null);
 public sealed record SaleLineInput(int ProductId, int Quantity, long DiscountPerUnit = 0);
-public sealed record SaleInput(string? CustomerName, string? CustomerPhone, List<SaleLineInput> Items);
+public sealed record SaleInput(string? CustomerName, string? CustomerPhone, List<SaleLineInput> Items, int? CustomerId = null, long? PaidAmount = null, string? DueDate = null);
 public sealed record OnlineOrderLineInput(int ProductId, int Quantity);
 public sealed record OnlineOrderInput(string? CustomerName, string? CustomerPhone, string? Fulfillment, string? Address, string? Note, List<OnlineOrderLineInput>? Items);
 public sealed record ReturnLineInput(int SaleItemId, int Quantity, string Disposition, bool Refund);

@@ -4,7 +4,7 @@ import {
   ReceiptText, ScanLine, Search, ShoppingCart, X,
 } from 'lucide-react'
 import { api } from '../api'
-import type { Product, Summary } from '../types'
+import type { Party, Product, Summary } from '../types'
 import { dateTime, money, searchKey } from '../utils/format'
 
 type CartLine = { product: Product; quantity: number; discountPerUnit: number }
@@ -26,6 +26,11 @@ export function SalesPage({ active, products, summary, now, onRefresh, onShowInv
   const [manualSearch, setManualSearch] = useState('')
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
+  const [customerId, setCustomerId] = useState<number | null>(null)
+  const [customers, setCustomers] = useState<Party[]>([])
+  const [paymentMode, setPaymentMode] = useState<'paid' | 'debt'>('paid')
+  const [paidAmount, setPaidAmount] = useState(0)
+  const [dueDate, setDueDate] = useState('')
   const [checkingOut, setCheckingOut] = useState(false)
   const [lastInvoice, setLastInvoice] = useState('')
   const scanRef = useRef<HTMLInputElement>(null)
@@ -34,6 +39,7 @@ export function SalesPage({ active, products, summary, now, onRefresh, onShowInv
   const scanningRef = useRef(false)
 
   useEffect(() => { if (active) scanRef.current?.focus() }, [active])
+  useEffect(() => { if (active) void api.parties('customer').then(setCustomers).catch(() => undefined) }, [active])
   useEffect(() => () => window.clearTimeout(scanTimerRef.current), [])
 
   const manualMatches = useMemo(() => {
@@ -123,14 +129,20 @@ export function SalesPage({ active, products, summary, now, onRefresh, onShowInv
     setCheckingOut(true)
     try {
       const sale = await api.createSale({
-        customerName, customerPhone,
+        customerName, customerPhone, customerId,
+        paidAmount: paymentMode === 'paid' ? cartTotal : paidAmount,
+        dueDate: paymentMode === 'debt' ? dueDate : '',
         items: cart.map(line => ({ productId: line.product.id, quantity: line.quantity, discountPerUnit: line.discountPerUnit })),
       })
       setCart([])
       setCustomerName('')
       setCustomerPhone('')
+      setCustomerId(null)
+      setPaymentMode('paid')
+      setPaidAmount(0)
+      setDueDate('')
       setLastInvoice(sale.number)
-      showToast(`Thanh toán thành công · ${sale.number}`)
+      showToast(`${paymentMode === 'debt' && paidAmount < cartTotal ? 'Đã lưu hoá đơn và công nợ' : 'Thanh toán thành công'} · ${sale.number}`)
       await onRefresh()
       scanRef.current?.focus()
     } catch (error) {
@@ -166,9 +178,9 @@ export function SalesPage({ active, products, summary, now, onRefresh, onShowInv
 
         <aside className="order-panel panel">
           <div className="order-panel-top"><span className="section-icon dark"><ReceiptText size={20} /></span><div><h2>Thông tin đơn hàng</h2><p>Chi tiết thanh toán</p></div></div>
-          <div className="order-fields"><label>Họ tên khách hàng <span>(không bắt buộc)</span><input value={customerName} onChange={event => setCustomerName(event.target.value)} placeholder="Nhập tên khách hàng" maxLength={120} /></label><label>Số điện thoại <span>(không bắt buộc)</span><input value={customerPhone} onChange={event => setCustomerPhone(event.target.value)} placeholder="Nhập số điện thoại" maxLength={30} inputMode="tel" /></label><label>Thời gian mua<input value={dateTime(now)} readOnly className="readonly-input" /></label></div>
+          <div className="order-fields"><label>Khách hàng đã lưu <span>(nếu có)</span><select value={customerId ?? ''} onChange={event => { const id = Number(event.target.value); const found = customers.find(c => c.id === id); setCustomerId(found?.id ?? null); if (found) { setCustomerName(found.name); setCustomerPhone(found.phone) } }}><option value="">Khách mới / khách lẻ</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name} · {c.phone || 'chưa có SĐT'}</option>)}</select></label><label>Họ tên khách hàng <span>(không bắt buộc)</span><input value={customerName} onChange={event => { setCustomerName(event.target.value); setCustomerId(null) }} placeholder="Nhập tên khách hàng" maxLength={120} /></label><label>Số điện thoại <span>(không bắt buộc)</span><input value={customerPhone} onChange={event => { setCustomerPhone(event.target.value); setCustomerId(null) }} placeholder="Nhập số điện thoại" maxLength={30} inputMode="tel" /></label><label>Thời gian mua<input value={dateTime(now)} readOnly className="readonly-input" /></label><label>Thanh toán<select value={paymentMode} onChange={event => setPaymentMode(event.target.value as typeof paymentMode)}><option value="paid">Đã trả đủ</option><option value="debt">Trả một phần / ghi nợ</option></select></label>{paymentMode === 'debt' && <><label>Đã trả (đ)<input type="number" min={0} max={cartTotal} step={1} value={paidAmount} onChange={event => setPaidAmount(Number(event.target.value))} /></label><label>Hạn trả<input type="date" value={dueDate} onChange={event => setDueDate(event.target.value)} /></label><small>Còn nợ: {money(Math.max(0, cartTotal - paidAmount))}. Cần ghi khách hàng.</small></>}</div>
           <div className="order-summary"><div><span>Số lượng sản phẩm</span><strong>{cartCount}</strong></div><div><span>Tạm tính</span><strong>{money(cartSubtotal)}</strong></div><div><span>Giảm giá</span><strong>−{money(cartDiscount)}</strong></div><div className="total-row"><span>Tổng thanh toán</span><strong>{money(cartTotal)}</strong></div></div>
-          <button className="checkout-button" onClick={() => void checkout()} disabled={!cart.length || checkingOut}><span>{checkingOut ? 'Đang lưu đơn...' : 'Thanh toán & lưu hoá đơn'}</span><ArrowRight size={19} /></button>
+          <button className="checkout-button" onClick={() => void checkout()} disabled={!cart.length || checkingOut}><span>{checkingOut ? 'Đang lưu đơn...' : paymentMode === 'debt' ? 'Lưu hoá đơn & công nợ' : 'Thanh toán & lưu hoá đơn'}</span><ArrowRight size={19} /></button>
           <div className="order-footnote"><Check size={15} />Tồn kho được trừ sau khi thanh toán thành công.</div>
           {lastInvoice && <button className="last-invoice" onClick={onShowInvoices}><ReceiptText size={17} />Đơn vừa lưu: <strong>{lastInvoice}</strong><ArrowRight size={15} /></button>}
         </aside>

@@ -2,11 +2,14 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   AlertTriangle, Barcode as BarcodeIcon, Boxes, Check, Clock3, Download,
   FileClock, Menu, ReceiptText, RefreshCw, ShieldCheck, ShoppingCart, ClipboardList, Globe2, LogOut, ChartNoAxesCombined, Moon, Sun, UsersRound, X,
+  HandCoins, ContactRound,
 } from 'lucide-react'
 import { api } from './api'
 import { AdminLoginPage } from './components/AdminLoginPage'
 import { useTheme } from './hooks/useTheme'
 import { AccountsPage } from './pages/AccountsPage'
+import { CustomersPage } from './pages/CustomersPage'
+import { DebtsPage } from './pages/DebtsPage'
 import { HistoryPage } from './pages/HistoryPage'
 import { InvoicesPage } from './pages/InvoicesPage'
 import { OnlineOrdersPage } from './pages/OnlineOrdersPage'
@@ -20,8 +23,9 @@ import { dateTime } from './utils/format'
 import './App.css'
 import './account.css'
 import './theme.css'
+import './crm.css'
 
-type Page = 'sales' | 'products' | 'stock' | 'invoices' | 'onlineOrders' | 'revenue' | 'warranty' | 'history' | 'accounts'
+type Page = 'sales' | 'products' | 'stock' | 'invoices' | 'onlineOrders' | 'revenue' | 'warranty' | 'history' | 'accounts' | 'customers' | 'debts'
 type Toast = { message: string; kind: 'success' | 'error' }
 
 const pageTitles: Record<Page, string> = {
@@ -30,6 +34,7 @@ const pageTitles: Record<Page, string> = {
   onlineOrders: 'Đơn online',
   revenue: 'Doanh thu',
   accounts: 'Tài khoản',
+  customers: 'Khách hàng', debts: 'Công nợ',
 }
 
 function App() {
@@ -50,6 +55,7 @@ function App() {
   const [now, setNow] = useState(() => new Date())
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [onlyLowStock, setOnlyLowStock] = useState(false)
+  const [debtFocusPartyId, setDebtFocusPartyId] = useState<number | null>(null)
 
   const showToast = useCallback((message: string, kind: Toast['kind'] = 'success') => {
     setToast({ message, kind })
@@ -154,6 +160,8 @@ function App() {
             <button className={page === 'products' ? 'nav-item active' : 'nav-item'} onClick={() => selectPage('products')}><Boxes size={19} />Sản phẩm & kho</button>
             <button className={page === 'stock' ? 'nav-item active' : 'nav-item'} onClick={() => selectPage('stock')}><ClipboardList size={19} />Nhập kho / kiểm kê</button>
             <button className={page === 'invoices' ? 'nav-item active' : 'nav-item'} onClick={() => selectPage('invoices')}><ReceiptText size={19} />Hoá đơn</button>
+            <button className={page === 'customers' ? 'nav-item active' : 'nav-item'} onClick={() => selectPage('customers')}><ContactRound size={19} />Khách hàng</button>
+            <button className={page === 'debts' ? 'nav-item active' : 'nav-item'} onClick={() => { setDebtFocusPartyId(null); selectPage('debts') }}><HandCoins size={19} />Công nợ</button>
             <button className={page === 'onlineOrders' ? 'nav-item active' : 'nav-item'} onClick={() => selectPage('onlineOrders')}><Globe2 size={19} />Đơn online{onlineOrders.some(o => o.status === 'pending') && <span className="nav-count">{onlineOrders.filter(o => o.status === 'pending').length}</span>}</button>
             <button className={page === 'revenue' ? 'nav-item active' : 'nav-item'} onClick={() => selectPage('revenue')}><ChartNoAxesCombined size={19} />Doanh thu</button>
             <button className={page === 'warranty' ? 'nav-item active' : 'nav-item'} onClick={() => selectPage('warranty')}><ShieldCheck size={19} />Bảo hành</button>
@@ -176,6 +184,8 @@ function App() {
             <ProductsPage active={page === 'products'} products={products} summary={summary} onlyLowStock={onlyLowStock} onToggleLowStock={() => setOnlyLowStock(value => !value)} onRefresh={refresh} showToast={showToast} />
             <StockPage active={page === 'stock'} products={products} onRefresh={refresh} showToast={showToast} />
             <InvoicesPage active={page === 'invoices'} sales={sales} products={products} onRefresh={refresh} showToast={showToast} />
+            <CustomersPage active={page === 'customers'} onShowDebts={id => { setDebtFocusPartyId(id); selectPage('debts') }} showToast={showToast} />
+            <DebtsPage active={page === 'debts'} focusPartyId={debtFocusPartyId} onClearFocus={() => setDebtFocusPartyId(null)} showToast={showToast} />
             <OnlineOrdersPage active={page === 'onlineOrders'} orders={onlineOrders} onRefresh={refresh} showToast={showToast} />
             <RevenuePage active={page === 'revenue'} showToast={showToast} />
             <WarrantyPage active={page === 'warranty'} products={products} onRefresh={refresh} showToast={showToast} />

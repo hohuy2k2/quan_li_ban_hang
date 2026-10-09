@@ -23,6 +23,22 @@ export type AuthUser = { id: number; displayName: string; email: string; phone: 
 export type Account = AuthUser & { isActive: boolean; createdAt: string }
 export type AccountDetails = Pick<Account, 'displayName' | 'email' | 'phone' | 'role' | 'isActive'>
 
+export type PartyKind = 'customer' | 'supplier'
+export type PartyInput = { kind: PartyKind; name: string; phone: string; email: string; address: string; note: string }
+export type Party = PartyInput & { id: number; createdAt: string; balance: number }
+export type CustomerHistory = {
+  party: Party
+  sales: { id: number; number: string; soldAt: string; total: number; refunded: number; netTotal: number }[]
+  totalSpent: number
+}
+export type DebtPayment = { id: number; debtAccountId: number; amount: number; paidAt: string; note: string }
+export type Debt = {
+  id: number; partyId: number; partyName: string; partyKind: PartyKind
+  sourceType: 'sale' | 'receipt' | 'opening'; sourceId: number | null
+  reference: string; principal: number; paid: number; balance: number
+  dueDate: string; note: string; createdAt: string; payments: DebtPayment[]
+}
+
 export type RevenueRow = { period: string; sales: number; refunds: number; revenue: number; orders: number }
 export type RevenueReport = {
   from: string; to: string; sales: number; refunds: number; revenue: number; orders: number
@@ -57,6 +73,9 @@ export interface StockDocumentInput {
   supplier: string
   reason: string
   items: { productId: number; quantity: number; purchasePrice: number | null; purchasePriceIncludesTax: boolean | null }[]
+  supplierId?: number | null
+  paidAmount?: number | null
+  dueDate?: string
 }
 
 export interface SaleItem {
@@ -140,6 +159,9 @@ export interface SaleInput {
   customerName: string
   customerPhone: string
   items: { productId: number; quantity: number; discountPerUnit: number }[]
+  customerId?: number | null
+  paidAmount?: number | null
+  dueDate?: string
 }
 
 export interface ReturnInput {

@@ -1,4 +1,4 @@
-import type { Account, AccountDetails, AuthUser, OnlineOrder, Product, ProductAudit, ProductInput, ReturnInput, RevenueReport, Sale, SaleInput, SaleReturn, SaleReturnItem, StockMovement, StockDocument, StockDocumentInput, Summary, WarrantyCase, WarrantyStatus } from './types'
+import type { Account, AccountDetails, AuthUser, CustomerHistory, Debt, DebtPayment, OnlineOrder, Party, PartyInput, PartyKind, Product, ProductAudit, ProductInput, ReturnInput, RevenueReport, Sale, SaleInput, SaleReturn, SaleReturnItem, StockMovement, StockDocument, StockDocumentInput, Summary, WarrantyCase, WarrantyStatus } from './types'
 
 let csrfPromise: Promise<string> | null = null
 
@@ -75,6 +75,20 @@ export const api = {
     csrfPromise = null
   },
   accounts: () => request<Account[]>('/accounts'),
+  parties: (kind?: PartyKind) => request<Party[]>(`/parties${kind ? `?kind=${kind}` : ''}`),
+  createParty: (data: PartyInput) => request<Party>('/parties', { method: 'POST', body: JSON.stringify(data) }),
+  updateParty: (id: number, data: PartyInput) => request<Party>(`/parties/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  customerHistory: (id: number) => request<CustomerHistory>(`/parties/${id}/history`),
+  debts: (kind?: PartyKind) => request<Debt[]>(`/debts${kind ? `?kind=${kind}` : ''}`),
+  createOpeningDebt: (data: { partyId: number; amount: number; dueDate: string; note: string }) =>
+    request<Debt>('/debts/opening', { method: 'POST', body: JSON.stringify(data) }),
+  payDebt: (id: number, data: { amount: number; paidOn: string; note: string }) =>
+    request<DebtPayment>(`/debts/${id}/payments`, { method: 'POST', body: JSON.stringify(data) }),
+  exportDebts: async (kind?: PartyKind) => {
+    const response = await fetch(`/api/debts/export.xlsx${kind ? `?kind=${kind}` : ''}`)
+    if (!response.ok) throw new Error('Không xuất được tệp Excel công nợ.')
+    return response.blob()
+  },
   createAccount: (data: AccountDetails & { password: string }) =>
     request<Account>('/accounts', { method: 'POST', body: JSON.stringify(data) }),
   updateAccount: (id: number, data: AccountDetails) =>

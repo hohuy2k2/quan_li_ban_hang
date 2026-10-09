@@ -61,6 +61,7 @@ public static class AuthEndpoints
         db.AppUsers.Add(user);
         try { await db.SaveChangesAsync(); }
         catch (DbUpdateException) { return Results.Conflict(new { message = "Email này đã được đăng ký." }); }
+        await DebtEndpoints.SyncCustomerAccount(db, user);
         await SignIn(context, user);
         return Results.Created("/api/auth/me", PublicUser(user));
     }

@@ -129,6 +129,8 @@ public static class OnlineOrderEndpoints
             CustomerName = order.CustomerName, CustomerPhone = order.CustomerPhone,
             SoldAt = now, Total = order.Total
         };
+        var party = await DebtEndpoints.ResolveParty(db, "customer", null, order.CustomerName, order.CustomerPhone);
+        if (party is not null) sale.PartyId = party.Id;
         foreach (var line in order.Items)
         {
             var changed = await db.Products.Where(p => p.Id == line.ProductId && !p.IsDeleted && p.Quantity >= line.Quantity)
@@ -152,6 +154,17 @@ public static class OnlineOrderEndpoints
         }
         db.Sales.Add(sale);
         await db.SaveChangesAsync();
+        // Xác nhận đơn online chưa đồng nghĩa đã nhận tiền; ghi công nợ để thu khi giao/nhận.
+        if (party is not null && sale.Total > 0)
+        {
+            db.DebtAccounts.Add(new DebtAccount
+            {
+                PartyId = party.Id, SourceType = "sale", SourceId = sale.Id,
+                Reference = sale.Number, Principal = sale.Total, CreatedAt = now,
+                Note = "Đơn online chưa ghi nhận thanh toán"
+            });
+            await db.SaveChangesAsync();
+        }
         order.Status = "confirmed";
         order.ProcessedAt = now;
         order.SaleId = sale.Id;

@@ -91,3 +91,18 @@ Tài liệu này dành cho bạn tự kiểm thử các chức năng đăng nh�
 | T03 | Trên `/store/`, thêm sản phẩm vào giỏ rồi kiểm tra thông báo trên máy tính và điện thoại; bấm nút đóng thông báo. | Thông báo xuất hiện ở chính giữa phía trên màn hình, đọc được toàn bộ nội dung và đóng được. | ☐ |
 
 Nếu một trường hợp lỗi, hãy ghi lại **ID**, bước đang làm, kết quả thực tế và ảnh chụp màn hình. Tôi sẽ sửa theo trường hợp đó.
+
+## Khách hàng và công nợ
+
+| ID | Các bước | Kết quả mong đợi | Đã thử |
+| --- | --- | --- | --- |
+| D01 | Vào **Khách hàng**, tạo hồ sơ có tên, số điện thoại, email, địa chỉ, ghi chú; sửa lại ghi chú. | Hồ sơ được lưu, tìm được theo tên/điện thoại và giữ thay đổi sau tải lại. | ☐ |
+| D02 | Bán cho khách đã chọn trong danh bạ, mở **Lịch sử mua** của khách. | Hoá đơn vừa bán xuất hiện, tổng mua đúng sau khi trừ hàng hoàn. | ☐ |
+| D03 | Bán hoá đơn 200.000 đ, chọn **Trả một phần / ghi nợ**, đã trả 50.000 đ. | Trang Công nợ hiển thị khách còn nợ 150.000 đ và dẫn về mã hoá đơn. | ☐ |
+| D04 | Ghi thanh toán 100.000 đ cho khoản D03, rồi thử ghi 60.000 đ. | Lần đầu còn nợ 50.000 đ, lịch sử lưu ngày/ghi chú; lần sau bị chặn vì vượt số dư. | ☐ |
+| D05 | Nhập 4 món giá nhập 50.000 đ/món, đã trả 20.000 đ cho một nhà cung cấp. | Công nợ nhà cung cấp là 180.000 đ; ghi trả một phần cập nhật số dư. | ☐ |
+| D06 | Tạo **Nợ đầu kỳ** cho khách và nhà cung cấp, có hạn trả. | Hai khoản hiện đúng loại, số tiền, hạn trả; không làm thay đổi tồn kho/doanh thu. | ☐ |
+| D07 | Bấm **Xuất Excel** ở từng loại công nợ và mở tệp trong Excel. | Tệp `.xlsx` có sheet **Cong no** và **Thanh toan**, số dư khớp màn hình, chữ tiếng Việt đọc được. | ☐ |
+| D08 | Xác nhận đơn online chưa thu tiền, rồi xem Công nợ khách. | Hoá đơn và khoản chưa thanh toán được tạo; chỉ giảm công nợ sau khi ghi thanh toán. | ☐ |
+| D09 | Mở dữ liệu cửa hàng cũ sau nâng cấp. | Hoá đơn/phiếu nhập cũ vẫn còn trong lịch sử, không tự tạo công nợ; có thể nhập nợ cũ bằng **Nợ đầu kỳ**. | ☐ |
+| D10 | Thử xoá hoá đơn đã có lịch sử trả công nợ. | Hệ thống từ chối xoá để giữ đối chiếu thanh toán. | ☐ |

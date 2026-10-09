@@ -1,0 +1,24 @@
+.crm-panel,.debt-panel,.supplier-panel{overflow:hidden}
+.sidebar .nav-list{min-height:0;overflow-y:auto;scrollbar-width:thin;flex:1}
+.crm-toolbar,.debt-toolbar{display:flex;align-items:center;gap:12px;padding:17px 18px}
+.crm-toolbar .search-field,.debt-toolbar .search-field{flex:1;max-width:440px}
+.debt-toolbar select,.order-fields select{height:39px;border:1px solid #e1e8ef;border-radius:7px;padding:0 11px;background:#fff;color:#26394f;font-size:12px;width:100%}
+.crm-actions,.debt-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.debt-actions button,.crm-actions button,.page-heading .primary-button{display:inline-flex;align-items:center;gap:6px}
+.crm-modal{max-width:760px}.crm-form{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.crm-form label,.stock-payment label{display:grid;gap:7px;color:#4a5d72;font-size:11px;font-weight:700}
+.crm-form input,.crm-form select,.crm-form textarea,.stock-payment input,.stock-payment select{width:100%;border:1px solid #e1e8ef;border-radius:7px;padding:9px;color:#26394f;background:#fff;font:inherit;font-size:12px}
+.crm-form textarea{min-height:72px;resize:vertical}.crm-wide{grid-column:1/-1}
+.crm-total{margin:0 0 18px;color:#66798b;font-size:12px}.crm-total strong{color:#1e3d5a}
+.debt-tabs{display:flex;gap:8px;margin-bottom:16px}.debt-tabs button{border:1px solid #e0e7ef;border-radius:8px;background:#fff;color:#61758a;padding:11px 15px;font-size:12px;font-weight:700}.debt-tabs button.selected{border-color:#b9d2f3;background:#eaf2fc;color:#2265b6}
+.debt-summary{display:flex;gap:12px;margin-bottom:18px}.debt-summary>div{border:1px solid #e5ebf0;background:#fff;border-radius:10px;padding:16px 20px;min-width:180px}.debt-summary span{display:block;color:#8899a9;font-size:11px}.debt-summary strong{display:block;margin-top:6px;color:#203b57;font-size:20px}
+.debt-history{margin-top:16px;padding:18px}.debt-history h2{font-size:14px;margin-bottom:12px}.debt-history>div{display:flex;justify-content:space-between;gap:12px;border-top:1px solid #edf1f4;padding:10px 0;color:#64788b;font-size:12px}.debt-history strong{color:#274e78}.debt-history p{color:#8495a7;font-size:12px}
+.supplier-panel{margin-bottom:16px}.supplier-heading{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid #edf1f4}.supplier-heading strong{font-size:13px}.supplier-heading button{display:inline-flex;align-items:center;gap:5px}.supplier-list{max-height:180px;overflow:auto}.supplier-list>div{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 18px;border-bottom:1px solid #f0f3f6;color:#65798b;font-size:11px}.supplier-list strong{color:#2b4158}
+.stock-payment{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;border:1px solid #e5ecf2;border-radius:8px;padding:13px}.stock-payment>strong,.stock-payment>small{grid-column:1/-1}.stock-payment>small,.order-fields>small{color:#64798c;font-size:11px}
+@media(max-width:720px){.crm-form,.stock-payment{grid-template-columns:1fr}.crm-toolbar,.debt-toolbar{flex-wrap:wrap}.debt-toolbar .search-field{max-width:none;flex-basis:100%}.debt-summary>div{min-width:0;flex:1}.debt-summary strong{font-size:15px}.debt-tabs{flex-wrap:wrap}.page-heading:has(.debt-actions){flex-wrap:wrap}}
+@media screen {
+:root[data-theme='dark'] :is(.debt-summary>div,.debt-tabs button,.stock-payment){background:#172438;border-color:#304157;color:#e4eaf2}
+:root[data-theme='dark'] :is(.debt-tabs button.selected){background:#25466f;color:#e4eaf2}
+:root[data-theme='dark'] :is(.debt-summary strong,.crm-total strong,.supplier-list strong,.debt-history strong){color:#e8eef6}
+:root[data-theme='dark'] :is(.crm-form label,.stock-payment label,.supplier-list>div,.debt-history>div){color:#b0bed0}
+}

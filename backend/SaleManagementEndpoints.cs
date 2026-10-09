@@ -34,6 +34,10 @@ public static class SaleManagementEndpoints
         if (sale.Returns.Count > 0 ||
             await db.WarrantyCases.AnyAsync(w => w.Source == "customer" && w.SaleNumber == sale.Number))
             return Results.Conflict(new { message = "Hoá đơn đã có hàng trả hoặc bảo hành, không thể xoá. Hãy giữ lại để đối chiếu." });
+        var debt = await db.DebtAccounts.Include(d => d.Payments)
+            .FirstOrDefaultAsync(d => d.SourceType == "sale" && d.SourceId == id);
+        if (debt is not null && debt.Payments.Count > 0)
+            return Results.Conflict(new { message = "Hoá đơn đã có lịch sử trả công nợ, không thể xoá." });
 
         var now = DateTime.UtcNow;
         foreach (var line in sale.Items.GroupBy(i => i.ProductId))
@@ -51,6 +55,7 @@ public static class SaleManagementEndpoints
 
         sale.IsDeleted = true;
         sale.DeletedAt = now;
+        if (debt is not null) db.DebtAccounts.Remove(debt);
         await db.SaveChangesAsync();
         await transaction.CommitAsync();
         return Results.NoContent();
@@ -72,6 +77,9 @@ public static class SaleManagementEndpoints
         if (sale.IsDeleted) return Results.Conflict(new { message = "Hoá đơn đã xoá, không thể thay đổi." });
         if (sale.Returns.Count > 0)
             return Results.Conflict(new { message = "Hoá đơn đã có hàng trả. Không thể sửa sản phẩm hoặc thông tin khách của hoá đơn này." });
+        var debt = await db.DebtAccounts.Include(d => d.Payments)
+            .FirstOrDefaultAsync(d => d.SourceType == "sale" && d.SourceId == id);
+        var oldTotal = sale.Total;
 
         var oldItems = sale.Items.ToDictionary(i => i.ProductId);
         var newQuantities = lines.ToDictionary(i => i.ProductId, i => i.Quantity);
@@ -125,8 +133,31 @@ public static class SaleManagementEndpoints
             });
             sale.Total = checked(sale.Total + lineTotal);
         }
-        sale.CustomerName = input.CustomerName?.Trim() ?? "";
-        sale.CustomerPhone = input.CustomerPhone?.Trim() ?? "";
+        var nextName = input.CustomerName?.Trim() ?? "";
+        var nextPhone = input.CustomerPhone?.Trim() ?? "";
+        var party = sale.PartyId.HasValue && !input.CustomerId.HasValue &&
+            sale.CustomerName == nextName && sale.CustomerPhone == nextPhone
+            ? await db.BusinessParties.FirstOrDefaultAsync(p => p.Id == sale.PartyId.Value)
+            : await DebtEndpoints.ResolveParty(db, "customer", input.CustomerId, nextName, nextPhone);
+        if (input.CustomerId.HasValue && party is null)
+            return Results.BadRequest(new { message = "Không tìm thấy khách hàng đã chọn." });
+        sale.CustomerName = nextName;
+        sale.CustomerPhone = nextPhone;
+        if (debt is not null)
+        {
+            if (party is null) return Results.BadRequest(new { message = "Hoá đơn có công nợ cần thông tin khách hàng." });
+            var nextPrincipal = debt.Principal + sale.Total - oldTotal;
+            if (nextPrincipal < debt.Payments.Sum(p => p.Amount))
+                return Results.Conflict(new { message = "Tổng hoá đơn mới nhỏ hơn phần công nợ đã được thanh toán." });
+            debt.Principal = nextPrincipal;
+            debt.PartyId = party.Id;
+        }
+        if (party is not null)
+        {
+            sale.PartyId = party.Id;
+            sale.CustomerName = party.Name;
+            sale.CustomerPhone = party.Phone;
+        }
         await db.SaveChangesAsync();
         await transaction.CommitAsync();
         return Results.Ok(sale);
@@ -198,6 +229,10 @@ public static class SaleManagementEndpoints
             db.StockMovements.Add(NewMovement(product, line.Quantity, "Trả hàng nhập kho", sale.Number));
         }
         db.SaleReturns.Add(saleReturn);
+        var debt = await db.DebtAccounts.Include(d => d.Payments)
+            .FirstOrDefaultAsync(d => d.SourceType == "sale" && d.SourceId == id);
+        if (debt is not null)
+            debt.Principal = Math.Max(debt.Payments.Sum(p => p.Amount), debt.Principal - saleReturn.TotalRefund);
         await db.SaveChangesAsync();
         foreach (var item in saleReturn.Items.Where(i => i.Disposition == "warranty"))
         {

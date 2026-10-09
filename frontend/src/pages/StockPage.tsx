@@ -3,7 +3,7 @@ import { ClipboardList, Plus, Search, Trash2, X } from 'lucide-react'
 import { api } from '../api'
 import { Pagination } from '../components/Pagination'
 import { usePagination } from '../hooks/usePagination'
-import type { Product, StockDocument, StockDocumentInput, StockDocumentKind } from '../types'
+import type { Party, Product, StockDocument, StockDocumentInput, StockDocumentKind } from '../types'
 import { dateTime, money, searchKey } from '../utils/format'
 
 type Props = {
@@ -26,6 +26,11 @@ export function StockPage({ active, products, onRefresh, showToast }: Props) {
   const [kind, setKind] = useState<StockDocumentKind | null>(null)
   const [documentDate, setDocumentDate] = useState(today)
   const [supplier, setSupplier] = useState('')
+  const [supplierId, setSupplierId] = useState<number | null>(null)
+  const [suppliers, setSuppliers] = useState<Party[]>([])
+  const [paymentMode, setPaymentMode] = useState<'paid' | 'debt'>('paid')
+  const [paidAmount, setPaidAmount] = useState(0)
+  const [dueDate, setDueDate] = useState('')
   const [reason, setReason] = useState('')
   const [lines, setLines] = useState<Line[]>([blankLine()])
   const [selected, setSelected] = useState<StockDocument | null>(null)
@@ -42,6 +47,7 @@ export function StockPage({ active, products, onRefresh, showToast }: Props) {
     const timer = window.setTimeout(() => void load(), 0)
     return () => window.clearTimeout(timer)
   }, [active, load])
+  useEffect(() => { if (active) void api.parties('supplier').then(setSuppliers).catch(() => undefined) }, [active])
 
   const filtered = useMemo(() => documents.filter(doc => {
     if (filter && doc.kind !== filter) return false
@@ -49,11 +55,16 @@ export function StockPage({ active, products, onRefresh, showToast }: Props) {
       ...doc.lines.map(line => line.productCode + ' ' + line.productName)].join(' ')).includes(searchKey(search))
   }), [documents, filter, search])
   const pager = usePagination(filtered.length, 20, JSON.stringify([filter, search]))
+  const receiptTotal = lines.reduce((sum, line) => sum + line.quantity * (line.purchasePrice ?? 0), 0)
 
   function open(kindToCreate: StockDocumentKind) {
     setKind(kindToCreate)
     setDocumentDate(today())
     setSupplier('')
+    setSupplierId(null)
+    setPaymentMode('paid')
+    setPaidAmount(0)
+    setDueDate('')
     setReason('')
     setLines([blankLine()])
   }
@@ -75,7 +86,9 @@ export function StockPage({ active, products, onRefresh, showToast }: Props) {
     }
     setSaving(true)
     try {
-      const created = await api.createStockDocument({ kind, documentDate, supplier, reason,
+      const created = await api.createStockDocument({ kind, documentDate, supplier, supplierId, reason,
+        paidAmount: kind === 'receipt' ? (paymentMode === 'paid' ? receiptTotal : paidAmount) : null,
+        dueDate: kind === 'receipt' && paymentMode === 'debt' ? dueDate : '',
         items: lines.map(line => ({ ...line, purchasePrice: kind === 'receipt' ? line.purchasePrice : null,
           purchasePriceIncludesTax: kind === 'receipt' ? line.purchasePriceIncludesTax : null })) })
       await Promise.all([load(), onRefresh()])
@@ -104,7 +117,7 @@ export function StockPage({ active, products, onRefresh, showToast }: Props) {
       <div className="modal-header"><div><div className="eyebrow">PHIẾU KHO</div><h2>{kind === 'receipt' ? 'Nhập hàng vào kho' : 'Kiểm kê số lượng thực tế'}</h2></div><button className="icon-button" onClick={() => setKind(null)} aria-label="Đóng"><X size={21} /></button></div>
       <form onSubmit={event => void submit(event)} className="stock-form">
         <div className="stock-form-fields"><label>Ngày phiếu<input type="date" required value={documentDate} onChange={event => setDocumentDate(event.target.value)} /></label>
-          {kind === 'receipt' && <label>Nhà cung cấp<input maxLength={160} value={supplier} onChange={event => setSupplier(event.target.value)} placeholder="Tên nhà cung cấp" /></label>}
+          {kind === 'receipt' && <><label>Nhà cung cấp đã lưu<select value={supplierId ?? ''} onChange={event => { const id = Number(event.target.value); const found = suppliers.find(s => s.id === id); setSupplierId(found?.id ?? null); if (found) setSupplier(found.name) }}><option value="">Nhập tên mới</option>{suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label><label>Tên nhà cung cấp<input maxLength={160} value={supplier} onChange={event => { setSupplier(event.target.value); setSupplierId(null) }} placeholder="Tên nhà cung cấp" /></label></>}
           <label className="span-2">Lý do {kind === 'count' ? <em>*</em> : '(nếu có)'}<textarea required={kind === 'count'} maxLength={500} value={reason} onChange={event => setReason(event.target.value)} placeholder={kind === 'count' ? 'Ví dụ: Kiểm kê cuối tháng, điều chỉnh hàng thiếu...' : 'Ví dụ: Nhập theo đơn đặt hàng...'} /></label></div>
         <div className="stock-lines"><div className="stock-lines-heading"><strong>Sản phẩm trong phiếu</strong><button type="button" className="secondary-button" onClick={() => setLines(current => [...current, blankLine()])}><Plus size={15} />Thêm dòng</button></div>
           {lines.map((line, index) => <div className="stock-line" key={index}>
@@ -115,6 +128,7 @@ export function StockPage({ active, products, onRefresh, showToast }: Props) {
             <button type="button" className="stock-remove" disabled={lines.length === 1} onClick={() => setLines(current => current.filter((_, position) => position !== index))} aria-label="Xóa dòng"><Trash2 size={17} /></button>
           </div>)}</div>
         {kind === 'count' && <p className="stock-note">Nhập số lượng bạn đếm được. Hệ thống sẽ tự tính chênh lệch so với tồn kho hiện tại.</p>}
+        {kind === 'receipt' && <div className="stock-payment"><strong>Giá trị phiếu: {money(receiptTotal)}</strong><label>Thanh toán<select value={paymentMode} onChange={event => setPaymentMode(event.target.value as typeof paymentMode)}><option value="paid">Đã trả đủ</option><option value="debt">Trả một phần / ghi nợ</option></select></label>{paymentMode === 'debt' && <><label>Đã trả (đ)<input type="number" min={0} max={receiptTotal} step={1} value={paidAmount} onChange={event => setPaidAmount(Number(event.target.value))} /></label><label>Hạn trả<input type="date" value={dueDate} onChange={event => setDueDate(event.target.value)} /></label><small>Còn nợ: {money(Math.max(0, receiptTotal - paidAmount))}. Cần ghi nhà cung cấp.</small></>}</div>}
         <div className="modal-footer"><button type="button" className="secondary-button" onClick={() => setKind(null)}>Hủy</button><button type="submit" className="primary-button" disabled={saving}>{saving ? 'Đang lưu...' : 'Lưu phiếu'}</button></div>
       </form>
     </div></div>}

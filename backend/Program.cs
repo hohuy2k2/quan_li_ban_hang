@@ -141,6 +141,7 @@ app.MapAuthEndpoints();
 app.MapAccountEndpoints();
 app.MapProductMediaEndpoints(dataDirectory);
 app.MapRevenueEndpoints();
+app.MapDebtEndpoints();
 app.MapGet("/store", () =>
 {
     var index = Path.Combine(app.Environment.WebRootPath ?? "", "store", "index.html");
@@ -272,6 +273,9 @@ app.MapPost("/api/sales", async (InventoryDb db, SaleInput input) =>
         return Results.BadRequest(new { message = "Số lượng bán phải lớn hơn 0." });
     if (input.CustomerName?.Length > 120 || input.CustomerPhone?.Length > 30)
         return Results.BadRequest(new { message = "Thông tin khách hàng quá dài." });
+    if (input.PaidAmount < 0 || (input.DueDate is not null && input.DueDate != "" &&
+        !DateOnly.TryParseExact(input.DueDate, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _)))
+        return Results.BadRequest(new { message = "Số tiền đã trả hoặc hạn thanh toán không hợp lệ." });
 
     var lines = input.Items;
     await using var transaction = await db.Database.BeginTransactionAsync();
@@ -283,6 +287,15 @@ app.MapPost("/api/sales", async (InventoryDb db, SaleInput input) =>
         CustomerPhone = input.CustomerPhone?.Trim() ?? "",
         SoldAt = now
     };
+    var party = await DebtEndpoints.ResolveParty(db, "customer", input.CustomerId, sale.CustomerName, sale.CustomerPhone);
+    if (input.CustomerId.HasValue && party is null)
+        return Results.BadRequest(new { message = "Không tìm thấy khách hàng đã chọn." });
+    if (party is not null)
+    {
+        sale.PartyId = party.Id;
+        sale.CustomerName = party.Name;
+        sale.CustomerPhone = party.Phone;
+    }
 
     foreach (var line in lines)
     {
@@ -315,8 +328,22 @@ app.MapPost("/api/sales", async (InventoryDb db, SaleInput input) =>
         sale.Total = checked(sale.Total + lineTotal);
     }
 
+    var paid = input.PaidAmount ?? sale.Total;
+    if (paid > sale.Total) return Results.BadRequest(new { message = "Số tiền đã trả vượt tổng hoá đơn." });
+    if (paid < sale.Total && party is null)
+        return Results.BadRequest(new { message = "Bán chịu cần chọn hoặc nhập thông tin khách hàng." });
     db.Sales.Add(sale);
     await db.SaveChangesAsync();
+    if (paid < sale.Total)
+    {
+        db.DebtAccounts.Add(new DebtAccount
+        {
+            PartyId = party!.Id, SourceType = "sale", SourceId = sale.Id,
+            Reference = sale.Number, Principal = sale.Total - paid,
+            DueDate = input.DueDate ?? "", CreatedAt = now
+        });
+        await db.SaveChangesAsync();
+    }
     await transaction.CommitAsync();
     return Results.Created($"/api/sales/{sale.Id}", sale);
 });

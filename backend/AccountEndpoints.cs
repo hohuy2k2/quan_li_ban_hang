@@ -46,6 +46,7 @@ public static class AccountEndpoints
         user.SecurityStamp = Guid.NewGuid().ToString("N");
         try { await db.SaveChangesAsync(); }
         catch (DbUpdateException) { return Results.Conflict(new { message = "Email này đã được sử dụng." }); }
+        await DebtEndpoints.SyncCustomerAccount(db, user);
         await AuthEndpoints.SignIn(context, user);
         return Results.Ok(AuthEndpoints.PublicUser(user));
     }
@@ -90,6 +91,7 @@ public static class AccountEndpoints
         db.AppUsers.Add(user);
         try { await db.SaveChangesAsync(); }
         catch (DbUpdateException) { return Results.Conflict(new { message = "Email này đã được sử dụng." }); }
+        await DebtEndpoints.SyncCustomerAccount(db, user);
         return Results.Created($"/api/accounts/{user.Id}", PublicAccount(user));
     }
 
@@ -120,6 +122,7 @@ public static class AccountEndpoints
         user.SecurityStamp = Guid.NewGuid().ToString("N");
         try { await db.SaveChangesAsync(); }
         catch (DbUpdateException) { return Results.Conflict(new { message = "Email này đã được sử dụng." }); }
+        await DebtEndpoints.SyncCustomerAccount(db, user);
         return Results.Ok(PublicAccount(user));
     }
 
