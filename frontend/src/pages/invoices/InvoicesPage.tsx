@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, ReceiptText, Search } from 'lucide-react'
-import { api } from '../api'
-import { InvoiceDetailModal } from '../components/InvoiceDetailModal'
-import { InvoiceEditModal } from '../components/InvoiceEditModal'
-import { Pagination } from '../components/Pagination'
-import { usePagination } from '../hooks/usePagination'
-import { ReturnModal } from '../components/ReturnModal'
-import type { Product, ReturnInput, Sale, SaleInput } from '../types'
-import { dateTime, money, searchKey } from '../utils/format'
+import { api } from '../../api'
+import { InvoiceDetailModal } from './InvoiceDetailModal'
+import { InvoiceEditModal } from './InvoiceEditModal'
+import { Pagination } from '../../components/Pagination'
+import { usePagination } from '../../hooks/usePagination'
+import { ReturnModal } from './ReturnModal'
+import type { Product, ReturnInput, Sale, SaleInput } from '../../types'
+import { dateTime, money, searchKey } from '../../utils/format'
 
 type Props = {
   active: boolean

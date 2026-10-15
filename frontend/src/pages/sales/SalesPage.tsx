@@ -3,9 +3,10 @@ import {
   AlertTriangle, ArrowRight, Barcode as BarcodeIcon, Check, Minus, Package, Plus,
   ReceiptText, ScanLine, Search, ShoppingCart, X,
 } from 'lucide-react'
-import { api } from '../api'
-import type { Party, Product, Summary } from '../types'
-import { dateTime, money, searchKey } from '../utils/format'
+import { api } from '../../api'
+import { SalesPrintModal, type SalesPrintData, type VatStatus } from './SalesPrintModal'
+import type { Party, Product, Summary } from '../../types'
+import { dateTime, money, searchKey } from '../../utils/format'
 
 type CartLine = { product: Product; quantity: number; discountPerUnit: number }
 type Props = {
@@ -26,6 +27,7 @@ export function SalesPage({ active, products, summary, now, onRefresh, onShowInv
   const [manualSearch, setManualSearch] = useState('')
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
+  const [customerAddress, setCustomerAddress] = useState('')
   const [customerId, setCustomerId] = useState<number | null>(null)
   const [customers, setCustomers] = useState<Party[]>([])
   const [paymentMode, setPaymentMode] = useState<'paid' | 'debt'>('paid')
@@ -33,6 +35,9 @@ export function SalesPage({ active, products, summary, now, onRefresh, onShowInv
   const [dueDate, setDueDate] = useState('')
   const [checkingOut, setCheckingOut] = useState(false)
   const [lastInvoice, setLastInvoice] = useState('')
+  const [printOnCheckout, setPrintOnCheckout] = useState(false)
+  const [vatStatus, setVatStatus] = useState<VatStatus>('')
+  const [printJob, setPrintJob] = useState<{ data: SalesPrintData; autoPrint: boolean } | null>(null)
   const scanRef = useRef<HTMLInputElement>(null)
   const scanCodeRef = useRef('')
   const scanTimerRef = useRef<number | undefined>(undefined)
@@ -124,6 +129,19 @@ export function SalesPage({ active, products, summary, now, onRefresh, onShowInv
       : line))
   }
 
+  /** Lập mẫu in từ giỏ hàng hiện tại; xem hoặc in không lưu đơn và không trừ kho. */
+  function previewQuote() {
+    if (!cart.length) return
+    setPrintJob({ autoPrint: false, data: {
+      kind: 'quote', vatStatus, date: new Date().toISOString(), customerName, customerPhone, customerAddress,
+      lines: cart.map(line => ({
+        code: line.product.code, name: line.product.name, unit: line.product.unit,
+        quantity: line.quantity, unitPrice: line.product.salePrice, discountPerUnit: line.discountPerUnit,
+      })),
+      total: cartTotal,
+    } })
+  }
+
   async function checkout() {
     if (!cart.length) return
     setCheckingOut(true)
@@ -137,13 +155,25 @@ export function SalesPage({ active, products, summary, now, onRefresh, onShowInv
       setCart([])
       setCustomerName('')
       setCustomerPhone('')
+      setCustomerAddress('')
       setCustomerId(null)
       setPaymentMode('paid')
       setPaidAmount(0)
       setDueDate('')
+      setPrintOnCheckout(false)
+      setVatStatus('')
       setLastInvoice(sale.number)
       showToast(`${paymentMode === 'debt' && paidAmount < cartTotal ? 'Đã lưu hoá đơn và công nợ' : 'Thanh toán thành công'} · ${sale.number}`)
       await onRefresh()
+      if (printOnCheckout) setPrintJob({ autoPrint: true, data: {
+        kind: 'receipt', vatStatus, number: sale.number, date: sale.soldAt,
+        customerName: sale.customerName, customerPhone: sale.customerPhone, customerAddress,
+        lines: sale.items.map(item => ({
+          code: item.productCode, name: item.productName, unit: item.unit,
+          quantity: item.quantity, unitPrice: item.unitPrice, discountPerUnit: item.discountPerUnit,
+        })),
+        total: sale.total, paidAmount: sale.paidAtSale ?? sale.total,
+      } })
       scanRef.current?.focus()
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Không lưu được đơn hàng.', 'error')
@@ -178,13 +208,17 @@ export function SalesPage({ active, products, summary, now, onRefresh, onShowInv
 
         <aside className="order-panel panel">
           <div className="order-panel-top"><span className="section-icon dark"><ReceiptText size={20} /></span><div><h2>Thông tin đơn hàng</h2><p>Chi tiết thanh toán</p></div></div>
-          <div className="order-fields"><label>Khách hàng đã lưu <span>(nếu có)</span><select value={customerId ?? ''} onChange={event => { const id = Number(event.target.value); const found = customers.find(c => c.id === id); setCustomerId(found?.id ?? null); if (found) { setCustomerName(found.name); setCustomerPhone(found.phone) } }}><option value="">Khách mới / khách lẻ</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name} · {c.phone || 'chưa có SĐT'}</option>)}</select></label><label>Họ tên khách hàng <span>(không bắt buộc)</span><input value={customerName} onChange={event => { setCustomerName(event.target.value); setCustomerId(null) }} placeholder="Nhập tên khách hàng" maxLength={120} /></label><label>Số điện thoại <span>(không bắt buộc)</span><input value={customerPhone} onChange={event => { setCustomerPhone(event.target.value); setCustomerId(null) }} placeholder="Nhập số điện thoại" maxLength={30} inputMode="tel" /></label><label>Thời gian mua<input value={dateTime(now)} readOnly className="readonly-input" /></label><label>Thanh toán<select value={paymentMode} onChange={event => setPaymentMode(event.target.value as typeof paymentMode)}><option value="paid">Đã trả đủ</option><option value="debt">Trả một phần / ghi nợ</option></select></label>{paymentMode === 'debt' && <><label>Đã trả (đ)<input type="number" min={0} max={cartTotal} step={1} value={paidAmount} onChange={event => setPaidAmount(Number(event.target.value))} /></label><label>Hạn trả<input type="date" value={dueDate} onChange={event => setDueDate(event.target.value)} /></label><small>Còn nợ: {money(Math.max(0, cartTotal - paidAmount))}. Cần ghi khách hàng.</small></>}</div>
+          <div className="order-fields"><label>Khách hàng đã lưu <span>(nếu có)</span><select value={customerId ?? ''} onChange={event => { const id = Number(event.target.value); const found = customers.find(c => c.id === id); setCustomerId(found?.id ?? null); setCustomerName(found?.name ?? ''); setCustomerPhone(found?.phone ?? ''); setCustomerAddress(found?.address ?? '') }}><option value="">Khách mới / khách lẻ</option>{customers.map(c => <option key={c.id} value={c.id}>{c.name} · {c.phone || 'chưa có SĐT'}</option>)}</select></label><label>Họ tên khách hàng <span>(không bắt buộc)</span><input value={customerName} onChange={event => { setCustomerName(event.target.value); setCustomerId(null); setCustomerAddress('') }} placeholder="Nhập tên khách hàng" maxLength={120} /></label><label>Số điện thoại <span>(không bắt buộc)</span><input value={customerPhone} onChange={event => { setCustomerPhone(event.target.value); setCustomerId(null); setCustomerAddress('') }} placeholder="Nhập số điện thoại" maxLength={30} inputMode="tel" /></label><label>Địa chỉ trên bản in <span>(không bắt buộc)</span><input value={customerAddress} onChange={event => setCustomerAddress(event.target.value)} placeholder="Địa chỉ khách hàng" maxLength={200} /></label><label>Thời gian mua<input value={dateTime(now)} readOnly className="readonly-input" /></label><label>Thanh toán<select value={paymentMode} onChange={event => setPaymentMode(event.target.value as typeof paymentMode)}><option value="paid">Đã trả đủ</option><option value="debt">Trả một phần / ghi nợ</option></select></label>{paymentMode === 'debt' && <><label>Đã trả (đ)<input type="number" min={0} max={cartTotal} step={1} value={paidAmount} onChange={event => setPaidAmount(Number(event.target.value))} /></label><label>Hạn trả<input type="date" value={dueDate} onChange={event => setDueDate(event.target.value)} /></label><small>Còn nợ: {money(Math.max(0, cartTotal - paidAmount))}. Cần ghi khách hàng.</small></>}</div>
           <div className="order-summary"><div><span>Số lượng sản phẩm</span><strong>{cartCount}</strong></div><div><span>Tạm tính</span><strong>{money(cartSubtotal)}</strong></div><div><span>Giảm giá</span><strong>−{money(cartDiscount)}</strong></div><div className="total-row"><span>Tổng thanh toán</span><strong>{money(cartTotal)}</strong></div></div>
+          <label className="sales-vat-select">VAT trên bản in<select value={vatStatus} onChange={event => setVatStatus(event.target.value as VatStatus)}><option value="">Không ghi VAT</option><option value="included">Giá đã gồm VAT</option><option value="excluded">Giá chưa gồm VAT</option></select><small>Chỉ ghi trạng thái, không thay đổi tổng tiền.</small></label>
+          <div className="sales-print-actions"><button type="button" onClick={previewQuote} disabled={!cart.length || checkingOut}><ReceiptText size={16} />In báo giá</button></div>
+          <label className="sales-print-choice"><input type="checkbox" checked={printOnCheckout} onChange={event => setPrintOnCheckout(event.target.checked)} />In phiếu bán hàng sau khi thanh toán</label>
           <button className="checkout-button" onClick={() => void checkout()} disabled={!cart.length || checkingOut}><span>{checkingOut ? 'Đang lưu đơn...' : paymentMode === 'debt' ? 'Lưu hoá đơn & công nợ' : 'Thanh toán & lưu hoá đơn'}</span><ArrowRight size={19} /></button>
           <div className="order-footnote"><Check size={15} />Tồn kho được trừ sau khi thanh toán thành công.</div>
           {lastInvoice && <button className="last-invoice" onClick={onShowInvoices}><ReceiptText size={17} />Đơn vừa lưu: <strong>{lastInvoice}</strong><ArrowRight size={15} /></button>}
         </aside>
       </div>
+      {printJob && <SalesPrintModal document={printJob.data} autoPrint={printJob.autoPrint} onClose={() => setPrintJob(null)} />}
     </section>
   )
 }

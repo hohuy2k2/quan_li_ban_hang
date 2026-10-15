@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Barcode as BarcodeIcon, ChevronDown, Plus, Trash2, X } from 'lucide-react'
-import { api } from '../api'
-import type { Product, ProductInput } from '../types'
+import { api } from '../../api'
+import type { Product, ProductInput } from '../../types'
 
 type Props = {
   editing: Product | null

@@ -1,5 +1,5 @@
 import { Moon, ShoppingBag, Sun, UserRound, Zap } from 'lucide-react'
-import logo from '../image/logo_1.png'
+import logo from '../assets/logo_1.png'
 import type { AuthUser } from '../types'
 
 type Props = { cartCount: number; user: AuthUser | null; theme: 'light' | 'dark'; onToggleTheme: () => void; onHome: () => void; onOpenCart: () => void; onOpenAccount: () => void }

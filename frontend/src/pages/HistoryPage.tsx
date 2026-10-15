@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Boxes, FileClock, Search } from 'lucide-react'
 import { api } from '../api'
-import { InvoiceDetailModal } from '../components/InvoiceDetailModal'
+import { InvoiceDetailModal } from './invoices/InvoiceDetailModal'
 import { Pagination } from '../components/Pagination'
 import { usePagination } from '../hooks/usePagination'
 import type { ProductAudit, Sale, StockMovement } from '../types'

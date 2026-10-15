@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react'
 import { AlertTriangle, ChevronDown, Package, Pencil, Plus, Printer, Search, Trash2 } from 'lucide-react'
-import { api } from '../api'
-import { LabelPrintModal } from '../components/LabelPrintModal'
-import { Pagination } from '../components/Pagination'
-import { usePagination } from '../hooks/usePagination'
-import { ProductFormModal } from '../components/ProductFormModal'
-import type { Product, ProductInput, Summary } from '../types'
-import { money, searchKey } from '../utils/format'
+import { api } from '../../api'
+import { LabelPrintModal } from './LabelPrintModal'
+import { Pagination } from '../../components/Pagination'
+import { usePagination } from '../../hooks/usePagination'
+import { ProductFormModal } from './ProductFormModal'
+import type { Product, ProductInput, Summary } from '../../types'
+import { money, searchKey } from '../../utils/format'
 
 type Props = {
   active: boolean

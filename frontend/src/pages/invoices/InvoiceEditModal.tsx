@@ -1,7 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { Plus, Search, Trash2, X } from 'lucide-react'
-import type { Product, Sale, SaleInput } from '../types'
-import { money, searchKey } from '../utils/format'
+import type { Product, Sale, SaleInput } from '../../types'
+import { money, searchKey } from '../../utils/format'
 
 type Props = {
   sale: Sale

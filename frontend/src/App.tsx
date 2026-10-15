@@ -11,19 +11,19 @@ import { AccountsPage } from './pages/AccountsPage'
 import { CustomersPage } from './pages/CustomersPage'
 import { DebtsPage } from './pages/DebtsPage'
 import { HistoryPage } from './pages/HistoryPage'
-import { InvoicesPage } from './pages/InvoicesPage'
+import { InvoicesPage } from './pages/invoices/InvoicesPage'
 import { OnlineOrdersPage } from './pages/OnlineOrdersPage'
-import { ProductsPage } from './pages/ProductsPage'
+import { ProductsPage } from './pages/products/ProductsPage'
 import { RevenuePage } from './pages/RevenuePage'
-import { SalesPage } from './pages/SalesPage'
+import { SalesPage } from './pages/sales/SalesPage'
 import { StockPage } from './pages/StockPage'
 import { WarrantyPage } from './pages/WarrantyPage'
 import type { AuthUser, OnlineOrder, Product, ProductAudit, Sale, StockMovement, Summary } from './types'
 import { dateTime } from './utils/format'
-import './App.css'
-import './account.css'
-import './theme.css'
-import './crm.css'
+import './styles/App.css'
+import './styles/account.css'
+import './styles/theme.css'
+import './styles/crm.css'
 
 type Page = 'sales' | 'products' | 'stock' | 'invoices' | 'onlineOrders' | 'revenue' | 'warranty' | 'history' | 'accounts' | 'customers' | 'debts'
 type Toast = { message: string; kind: 'success' | 'error' }
@@ -175,7 +175,7 @@ function App() {
           <header className="topbar">
             <button className="mobile-menu icon-button" onClick={() => setSidebarOpen(value => !value)} aria-label="Mở menu"><Menu size={21} /></button>
             <div className="breadcrumb">TỔNG QUAN <span>/</span> <strong>{pageTitles[page]}</strong></div>
-            <div className="topbar-right"><span className="top-date"><Clock3 size={16} />{dateTime(now)}</span><button className="theme-toggle" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối'}>{theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}</button><div className="avatar">{authUser.displayName.trim().slice(0, 2).toUpperCase()}</div></div>
+            <div className="topbar-right"><span className="top-date"><Clock3 size={16} />{dateTime(now)}</span><button className="theme-toggle" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối'}>{theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}</button><div className="avatar">{authUser.displayName.trim().toUpperCase()}</div></div>
           </header>
 
           {loadError && <div className="connection-error"><AlertTriangle size={18} /><span>{loadError}</span><button onClick={() => void refresh()}><RefreshCw size={15} />Thử lại</button></div>}

@@ -98,6 +98,7 @@ export interface Sale {
   customerPhone: string
   soldAt: string
   total: number
+  paidAtSale: number | null
   isDeleted: boolean
   deletedAt: string | null
   items: SaleItem[]

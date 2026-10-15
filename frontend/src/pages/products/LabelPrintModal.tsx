@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import Barcode from 'react-barcode'
 import { Printer, X } from 'lucide-react'
-import type { Product } from '../types'
-import { money } from '../utils/format'
+import type { Product } from '../../types'
+import { money } from '../../utils/format'
 
 type Props = { product: Product; onClose: () => void }
 type LabelSize = '35x22' | '50x30'

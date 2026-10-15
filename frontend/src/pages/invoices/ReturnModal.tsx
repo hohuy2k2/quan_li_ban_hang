@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { X } from 'lucide-react'
-import type { ReturnDisposition, ReturnInput, Sale, SaleItem } from '../types'
-import { money } from '../utils/format'
+import type { ReturnDisposition, ReturnInput, Sale, SaleItem } from '../../types'
+import { money } from '../../utils/format'
 
 type Counts = Record<number, Record<ReturnDisposition, number>>
 type Props = {

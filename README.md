@@ -18,6 +18,7 @@
 - Trang **Nhập kho / kiểm kê** tạo phiếu nhiều sản phẩm, có ngày phiếu, nhà cung cấp, lý do, số lượng và giá nhập theo từng dòng. Phiếu kiểm kê nhập số lượng đếm thực tế; hệ thống lưu tồn trước/sau và biến động trong cùng giao dịch. Sản phẩm mới có tồn 0; muốn thay đổi tồn hãy lập phiếu thay vì sửa số lượng trong form sản phẩm.
 
 - In tem 35 × 22 mm hoặc 50 × 30 mm gồm tên, giá bán và mã vạch Code 128.
+- Từ giỏ bán hàng, xem trước và in **giấy báo giá** trước khi thanh toán; thao tác này không tạo hoá đơn và không trừ kho. Khi lưu đơn, có thể chọn tự mở hộp thoại in phiếu bán hàng hoặc bỏ qua. Mẫu giấy A5 mặc định, đổi được sang A4. Đầu phiếu có tên Đồ Điện Việt Thu, ngành hàng, địa chỉ, điện thoại và STK; bên phải luôn in ảnh `frontend/src/assets/qr.png`. Các thông tin cửa hàng có thể sửa và được nhớ trên trình duyệt đang dùng. Có thể chọn **giá đã gồm VAT**, **giá chưa gồm VAT** hoặc không ghi VAT trên bản in; lựa chọn này chỉ hiện dòng chú thích, không tính lại giá hay tổng tiền.
 - Bán hàng bằng mã quét hoặc tìm thủ công. Sau khi quét xong, sản phẩm tự vào đơn mà không cần Enter; quét lại cùng mã tăng số lượng.
 - Giảm giá bằng số tiền trên mỗi món trong giỏ hàng; hóa đơn lưu giá gốc, mức giảm và thành tiền. Khi trả hàng, tiền hoàn dựa trên giá đã trả sau giảm.
 - Nhập tên, số điện thoại khách và xem thời gian, tổng tiền ở bên phải. Thanh toán lưu hoá đơn và trừ kho trong cùng giao dịch.
@@ -38,15 +39,25 @@ Các hoá đơn và phiếu nhập có trước khi thêm công nợ được co
 
 Với hoá đơn ghi nợ lập trước bản cập nhật này, phần mềm chưa từng lưu riêng số đã thu lúc bán. Bảng chi tiết sẽ ghi rõ **ước tính từ dữ liệu cũ** tại dòng đó; nên đối chiếu chứng từ gốc trước khi gửi khách nếu hoá đơn cũ đã có trả hàng.
 
+## Cấu trúc backend
+
+- `backend/Program.cs`: cấu hình dịch vụ, bảo mật, khởi tạo dữ liệu và đăng ký các nhóm API.
+- `backend/Endpoints/`: API theo nghiệp vụ (sản phẩm, bán hàng, kho, hoá đơn, bảo hành, tài khoản, công nợ, báo cáo và sao lưu).
+- `backend/Models/`: kiểu dữ liệu của từng nhóm chức năng.
+- `backend/Data/`: `InventoryDb` và các bước bổ sung cấu trúc SQLite cho dữ liệu cũ.
+- `backend/Exports/`: tạo các tệp Excel công nợ.
+- `backend/Services/`: tạo admin, thông báo đơn online và gửi email khôi phục mật khẩu.
+
 ## Cấu trúc giao diện
 
 - `frontend/src/App.tsx`: khung ứng dụng, điều hướng và tải dữ liệu chung.
-- `frontend/src/pages/`: các màn hình bán hàng, sản phẩm, phiếu kho, hoá đơn, khách hàng, công nợ, đơn online, doanh thu, bảo hành và lịch sử. Mỗi màn hình giữ trạng thái của chức năng mình.
-- `frontend/src/components/`: biểu mẫu sản phẩm, hộp thoại in tem, chi tiết hoá đơn và bộ điều khiển phân trang dùng chung (`Pagination.tsx`).
+- `frontend/src/pages/`: các màn hình quản lý. Thư mục `sales/`, `products/` và `invoices/` đặt trang cùng các hộp thoại riêng của chức năng đó; các trang khác nằm trực tiếp trong `pages/`.
+- `frontend/src/components/`: thành phần dùng chung như màn hình đăng nhập quản lý và điều khiển phân trang.
+- `frontend/src/styles/`: CSS nền, giao diện quản lý, tài khoản, công nợ, chủ đề sáng/tối và mẫu in A5/A4.
 - `frontend/src/utils/format.ts`: định dạng tiền, ngày giờ, tìm kiếm và nội dung lịch sử.
 - `frontend/src/hooks/usePagination.ts`: tính trang hiện tại và tự quay về trang 1 khi bộ lọc thay đổi.
 - `frontend/src/api.ts` và `frontend/src/types.ts`: gọi backend và khai báo kiểu dữ liệu.
-- `storefront/`: website React riêng cho khách hàng. `src/App.tsx` ghép các phần và giữ trạng thái dùng chung; `src/components/` chứa đầu trang, danh mục, chi tiết sản phẩm, giỏ hàng, tài khoản và biểu mẫu đặt hàng; `src/hooks/` quản lý sản phẩm và giỏ hàng; `src/api.ts` gọi backend; `src/types.ts` khai báo dữ liệu. API `/api/store/products` chỉ xuất thông tin bán hàng, không xuất giá nhập hoặc số tồn chính xác.
+- `storefront/`: website React riêng cho khách hàng. `src/App.tsx` ghép các phần và giữ trạng thái dùng chung; `src/components/` chứa đầu trang, danh mục, chi tiết sản phẩm, giỏ hàng, tài khoản và biểu mẫu đặt hàng; `src/hooks/` quản lý sản phẩm và giỏ hàng; `src/styles/` chứa CSS; `src/assets/` chứa logo; `src/api.ts` gọi backend; `src/types.ts` khai báo dữ liệu. API `/api/store/products` chỉ xuất thông tin bán hàng, không xuất giá nhập hoặc số tồn chính xác.
 
 ## Cài công cụ và thư viện (bạn tự chạy)
 

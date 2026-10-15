@@ -109,3 +109,28 @@ Nếu một trường hợp lỗi, hãy ghi lại **ID**, bước đang làm, k�
 | D08 | Xác nhận đơn online chưa thu tiền, rồi xem Công nợ khách. | Hoá đơn và khoản chưa thanh toán được tạo; chỉ giảm công nợ sau khi ghi thanh toán. | ☐ |
 | D09 | Mở dữ liệu cửa hàng cũ sau nâng cấp. | Hoá đơn/phiếu nhập cũ vẫn còn trong lịch sử, không tự tạo công nợ; có thể nhập nợ cũ bằng **Nợ đầu kỳ**. | ☐ |
 | D10 | Thử xoá hoá đơn đã có lịch sử trả công nợ. | Hệ thống từ chối xoá để giữ đối chiếu thanh toán. | ☐ |
+
+## Kiểm tra sau khi sắp xếp backend
+
+Các trường hợp dưới đây xác nhận việc chuyển mã nguồn sang thư mục mới không làm đổi chức năng; hãy dùng dữ liệu thử như phần **Chuẩn bị**.
+
+| ID | Các bước | Kết quả mong đợi | Đã thử |
+| --- | --- | --- | --- |
+| X01 | Khởi động backend, đăng nhập admin, mở lần lượt Sản phẩm, Bán hàng, Hoá đơn, Công nợ và Bảo hành. | Các trang tải dữ liệu bình thường, không báo API không tồn tại. | ☐ |
+| X02 | Tạo một sản phẩm, lập phiếu nhập kho, bán một món rồi xem lại hoá đơn và biến động kho. | Hoá đơn có đúng món và giá; tồn kho giảm một, lịch sử có biến động tương ứng. | ☐ |
+| X03 | Tạo một đơn trên website, xác nhận trong trang quản lý, sau đó mở **Đơn của tôi**. | Đơn đổi trạng thái; hoá đơn được tạo và tồn kho giảm đúng số lượng. | ☐ |
+| X04 | Tải bản sao lưu đầy đủ và xuất công nợ chi tiết của một khách có giao dịch. | Tệp ZIP có `inventory.db`; tệp Excel mở được và số dư khớp trang Công nợ. | ☐ |
+
+## In phiếu bán hàng và báo giá
+
+| ID | Các bước | Kết quả mong đợi | Đã thử |
+| --- | --- | --- | --- |
+| I01 | Thêm hai sản phẩm vào giỏ, đặt số lượng và giảm giá từng món, nhập thông tin khách rồi bấm **In báo giá**. | Mẫu **GIẤY BÁO GIÁ** hiển thị tên hàng, số lượng, đơn giá sau giảm, thành tiền và tổng đúng; đóng cửa sổ vẫn còn giỏ, chưa có hoá đơn và tồn kho không đổi. | ☐ |
+| I02 | Với giỏ đang có, kiểm tra các nút in trước khi thanh toán. | Chỉ có nút **In báo giá**; không còn nút **In phiếu trước**. Đóng báo giá không lưu đơn và không trừ kho. | ☐ |
+| I03 | Trong cửa sổ in, điền tên, địa chỉ, điện thoại cửa hàng; in thử một tờ A5, đổi A4 và in/lưu PDF. | Cột và chữ không bị cắt, thông tin cửa hàng hiện đúng; mở lại cửa sổ vẫn nhớ thông tin và khổ giấy đã chọn. | ☐ |
+| I04 | Chọn **In phiếu bán hàng sau khi thanh toán**, bấm thanh toán. | Sau khi lưu thành công, hộp thoại in tự mở; phiếu có mã và ngày hoá đơn thật, giỏ trống, tồn kho giảm đúng. Nếu đóng hộp thoại in, hoá đơn vẫn được lưu. | ☐ |
+| I05 | Tạo đơn khác nhưng bỏ chọn in sau thanh toán; thử thêm đơn bị từ chối vì thiếu tồn kho khi đã chọn in. | Đơn thành công không mở hộp thoại in khi bỏ chọn; đơn bị từ chối không in, không tạo hoá đơn. | ☐ |
+| I06 | Mở **In báo giá** trên trình duyệt chưa từng sửa thông tin in. | Đầu phiếu hiện ĐỒ ĐIỆN VIỆT THU, dòng ngành hàng, địa chỉ 66 HÀNG ĐỒNG, hai số điện thoại và STK như mẫu; bên phải có mã QR. | ☐ |
+| I07 | Mở báo giá và phiếu bán hàng, in thử A5 và A4. | Ảnh `frontend/src/assets/qr.png` nằm bên phải đầu phiếu, không chèn lên chữ; cửa sổ in không có nút chọn hoặc xoá ảnh QR. | ☐ |
+| I08 | Trên đơn đang lập, lần lượt chọn **Giá đã gồm VAT**, **Giá chưa gồm VAT** rồi **Không ghi VAT** và mở bản in báo giá/phiếu bán hàng. | Bản xem trước và bản in hiện đúng dòng tình trạng VAT đã chọn hoặc không hiện khi chọn không ghi; đơn giá, tổng tiền và tồn kho không thay đổi. | ☐ |
+| I09 | Mở giấy báo giá với từng lựa chọn VAT. | Giấy báo giá không còn hai dòng “Báo giá tham khảo · Chưa tạo đơn hàng” và “Giá và tình trạng hàng sẽ được xác nhận khi đặt mua”. | ☐ |

@@ -1,6 +1,6 @@
 import { X } from 'lucide-react'
-import type { Sale } from '../types'
-import { dateTime, money } from '../utils/format'
+import type { Sale } from '../../types'
+import { dateTime, money } from '../../utils/format'
 
 type Props = {
   sale: Sale
