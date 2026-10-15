@@ -39,6 +39,17 @@ Tài liệu này dành cho bạn tự kiểm thử các chức năng đăng nh�
 | P06 | Bấm ảnh, tên và vùng thẻ sản phẩm trên website; đóng hộp thoại. | Hộp thoại hiện đúng ảnh, tên, mã, hãng, loại, giá, trạng thái hàng và thông số; đóng được bằng nút **X** hoặc bấm nền ngoài. | ☐ |
 | P07 | Xem sản phẩm chưa có ảnh hoặc hết hàng. | Sản phẩm vẫn hiển thị được; nút mua của hàng hết tạm không cho đặt. | ☐ |
 
+## In tem PD304
+
+Trên máy bán hàng, chọn giấy **70 × 22 mm**, lề 0, tỷ lệ 100% và tắt đầu trang/chân trang trong hộp thoại in. Dùng cuộn hai tem 35 × 22 mm trên một hàng.
+
+| ID | Các bước | Kết quả mong đợi | Đã thử |
+| --- | --- | --- | --- |
+| L01 | Ở một sản phẩm, mở **In tem**, giữ chế độ mặc định **2 tem 35 × 22 mm / hàng**, nhập số lượng 2 và xem trước bản in. | Bản xem trước có một trang 70 × 22 mm, hai tem cạnh nhau; mỗi tem có tên, giá và mã vạch. | ☐ |
+| L02 | In 3 tem với cùng thiết lập. | Có hai hàng giấy: hàng đầu in hai tem, hàng cuối chỉ in tem bên trái; ô bên phải để trống. | ☐ |
+| L03 | In thử trên PD304, đo vị trí tem và dùng máy quét đọc mã của cả tem trái lẫn tem phải. | Nội dung nằm trong từng tem và cả hai mã đều quét được. Nếu lệch, đo lại chiều rộng cuộn, khoảng hở và hiệu chỉnh giấy/sensor trong driver. | ☐ |
+| L04 | Chọn chế độ **1 tem 35 × 22 mm / hàng** hoặc **50 × 30 mm**, in thử với đúng khổ giấy tương ứng trong driver. | Mỗi trang chỉ có một tem, không bị dàn hai cột. | ☐ |
+
 ## Giỏ hàng, mua ngay và lịch sử đơn
 
 | ID | Các bước | Kết quả mong đợi | Đã thử |

@@ -1,0 +1,60 @@
+.label-print-hint {
+  margin: 10px 0 0;
+  color: #687b90;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.label-settings .label-size {
+  grid-column: 1 / -1;
+}
+
+@media print {
+  /* Mỗi trang của driver là một hàng tem vật lý, không phải một tem riêng lẻ. */
+  html,
+  body {
+    min-width: 0 !important;
+  }
+
+  .print-sheet[data-label-layout='35x22-double'] {
+    width: 70mm;
+  }
+
+  .print-sheet[data-label-layout='35x22'] {
+    width: 35mm;
+  }
+
+  .print-sheet[data-label-layout='50x30'] {
+    width: 50mm;
+  }
+
+  .printed-label-row {
+    width: 100%;
+    height: 22mm;
+    display: grid;
+    grid-template-columns: 35mm;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .print-sheet[data-label-layout='35x22-double'] .printed-label-row {
+    grid-template-columns: 35mm 35mm;
+  }
+
+  .print-sheet[data-label-layout='50x30'] .printed-label-row {
+    height: 30mm;
+    grid-template-columns: 50mm;
+  }
+
+  .printed-label-row:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  .print-sheet .printed-label {
+    page-break-after: auto;
+    break-after: auto;
+  }
+}
