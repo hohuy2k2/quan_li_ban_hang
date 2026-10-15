@@ -2,9 +2,11 @@
 import { ClipboardList, Plus, Search, Trash2, X } from 'lucide-react'
 import { api } from '../api'
 import { Pagination } from '../components/Pagination'
+import { StockProductPicker } from '../components/StockProductPicker'
 import { usePagination } from '../hooks/usePagination'
 import type { Party, Product, StockDocument, StockDocumentInput, StockDocumentKind } from '../types'
 import { dateTime, money, searchKey } from '../utils/format'
+import './stock-page.css'
 
 type Props = {
   active: boolean
@@ -121,7 +123,7 @@ export function StockPage({ active, products, onRefresh, showToast }: Props) {
           <label className="span-2">Lý do {kind === 'count' ? <em>*</em> : '(nếu có)'}<textarea required={kind === 'count'} maxLength={500} value={reason} onChange={event => setReason(event.target.value)} placeholder={kind === 'count' ? 'Ví dụ: Kiểm kê cuối tháng, điều chỉnh hàng thiếu...' : 'Ví dụ: Nhập theo đơn đặt hàng...'} /></label></div>
         <div className="stock-lines"><div className="stock-lines-heading"><strong>Sản phẩm trong phiếu</strong><button type="button" className="secondary-button" onClick={() => setLines(current => [...current, blankLine()])}><Plus size={15} />Thêm dòng</button></div>
           {lines.map((line, index) => <div className="stock-line" key={index}>
-            <label className="stock-product">Sản phẩm<select required value={line.productId} onChange={event => chooseProduct(index, Number(event.target.value))}><option value={0}>Chọn sản phẩm</option>{products.map(product => <option key={product.id} value={product.id}>{product.code} · {product.name} · tồn {product.quantity}</option>)}</select></label>
+            <StockProductPicker key={line.productId} products={products} value={line.productId} onChange={id => chooseProduct(index, id)} />
             <label>{kind === 'receipt' ? 'Số lượng nhập' : 'Đếm thực tế'}<input type="number" required min={kind === 'receipt' ? 1 : 0} step="1" value={line.quantity} onChange={event => updateLine(index, { quantity: Number(event.target.value) })} /></label>
             {kind === 'receipt' && <><label>Giá nhập / món<input type="number" required min="0" step="1" value={line.purchasePrice ?? 0} onChange={event => updateLine(index, { purchasePrice: Number(event.target.value) })} /></label>
               <label>Thuế giá nhập<select value={line.purchasePriceIncludesTax ? 'yes' : 'no'} onChange={event => updateLine(index, { purchasePriceIncludesTax: event.target.value === 'yes' })}><option value="no">Chưa thuế</option><option value="yes">Có thuế</option></select></label></>}

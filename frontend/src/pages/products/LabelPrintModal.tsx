@@ -28,10 +28,16 @@ export function LabelPrintModal({ product, onClose }: Props) {
               <button className="icon-button" onClick={onClose} aria-label="Đóng"><X size={21} /></button>
             </div>
             <p className="modal-description">Khổ cuộn hai tem: chọn 70 × 22 mm trong driver PD304 và ở hộp thoại in. Đặt lề 0, tỷ lệ 100% và tắt đầu trang/chân trang.</p>
-            <div className={'label-preview' + (compact ? ' compact' : '')}>
-              <strong>{product.name}</strong><span>{money(product.salePrice)}</span>
-              <Barcode value={product.code} format="CODE128" width={compact ? 1.05 : 1.25} height={compact ? 26 : 38} displayValue={false} margin={0} />
-              <small>{product.code}</small>
+            <div className={'label-preview-row' + (labelsPerRow === 2 ? ' double' : '')}>
+              {Array.from({ length: labelsPerRow }, (_, index) =>
+                <div className={'label-preview' + (compact ? ' compact' : '') + (index >= quantity ? ' empty' : '')} key={index}>
+                  {index < quantity && <>
+                    <strong>{product.name}</strong><span>{money(product.salePrice)}</span>
+                    <Barcode value={product.code} format="CODE128" width={compact ? 1.05 : 1.25} height={compact ? 26 : 38} displayValue={false} margin={0} />
+                    <small>{product.code}</small>
+                  </>}
+                </div>
+              )}
             </div>
             <div className="label-settings">
               <label className="label-size">Khổ tem
@@ -46,7 +52,7 @@ export function LabelPrintModal({ product, onClose }: Props) {
                   onChange={event => setQuantity(Math.min(200, Math.max(1, Math.floor(Number(event.target.value) || 1))))} />
               </label>
             </div>
-            {labelsPerRow === 2 && <p className="label-print-hint">Số tem là số tem riêng lẻ. Nếu chọn số lẻ, ô bên phải của hàng cuối sẽ để trống.</p>}
+            {labelsPerRow === 2 && <p className="label-print-hint">PD304 · {quantity} tem = {Math.ceil(quantity / 2)} hàng giấy 70 × 22 mm. Mỗi ô tem rộng 35 mm, cao 22 mm. Nếu chọn số lẻ, ô bên phải của hàng cuối sẽ để trống.</p>}
             {compact && product.code.length > 12 && <p className="label-warning">Mã sản phẩm khá dài với tem 35 × 22 mm. Hãy in thử một tem và quét kiểm tra.</p>}
             <div className="modal-footer"><button className="secondary-button" onClick={onClose}>Đóng</button>
               <button className="primary-button" onClick={() => window.print()}><Printer size={18} />In {quantity} tem</button></div>

@@ -1,0 +1,14 @@
+.stock-page .stock-modal {
+  width: min(100%, 1100px);
+  max-width: 1100px;
+  min-width: 0;
+}
+
+.stock-page .stock-line > label {
+  min-width: 0;
+}
+
+.stock-page .stock-line input,
+.stock-page .stock-line select {
+  min-width: 0;
+}

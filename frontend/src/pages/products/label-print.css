@@ -1,3 +1,45 @@
+.label-preview-row {
+  margin-bottom: 20px;
+}
+
+.label-preview-row .label-preview {
+  margin-bottom: 0;
+}
+
+.label-preview-row.double {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.label-preview-row.double .label-preview {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: 35 / 22;
+  border-radius: 0;
+  padding: 5px;
+}
+
+.label-preview-row .label-preview.empty {
+  background: #f8fafc;
+}
+
+.label-preview-row .label-preview strong {
+  font-weight: 700;
+}
+
+.label-preview-row .label-preview span {
+  font-weight: 400;
+}
+
+.label-preview-row .label-preview.compact strong {
+  font-size: 11px;
+  line-height: 1.08;
+  max-height: 24px;
+  flex-shrink: 0;
+}
+
 .label-print-hint {
   margin: 10px 0 0;
   color: #687b90;
@@ -56,5 +98,20 @@
   .print-sheet .printed-label {
     page-break-after: auto;
     break-after: auto;
+  }
+
+  .print-sheet .printed-label strong {
+    font-weight: 700;
+  }
+
+  .print-sheet .printed-label b {
+    font-weight: 400;
+  }
+
+  .print-sheet .printed-label.compact strong {
+    font-size: 7.5pt;
+    line-height: 1.08;
+    max-height: 5.8mm;
+    flex-shrink: 0;
   }
 }
